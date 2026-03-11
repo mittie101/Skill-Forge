@@ -1,0 +1,47 @@
+{
+  "name": "skillforge",
+  "version": "0.1.0",
+  "description": "LLM skill/prompt .md file generator",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "test": "jest --testPathPattern=tests/",
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "icon": "node scripts/create-placeholder-icon.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-rebuild": "^3.2.9",
+    "jest": "^29.0.0"
+  },
+  "build": {
+    "appId": "com.skillforge.app",
+    "productName": "SkillForge",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "main/**/*",
+      "ipc/**/*",
+      "src/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "src/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}
