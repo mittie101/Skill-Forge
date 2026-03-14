@@ -23,7 +23,7 @@ function _isWithinFolder(filePath, folder) {
 function _buildPath(folder, slug, mode) {
     return mode === 'flat'
         ? path.join(folder, `${slug}.md`)
-        : path.join(folder, slug, 'SKILL.md');
+        : path.join(folder, slug, `${slug}.md`);
 }
 
 function register() {

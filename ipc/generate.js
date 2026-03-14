@@ -13,6 +13,7 @@ const { getSetting }       = require('../main/db/settings');
 const { decryptKey }       = require('../main/storage');
 const { insertHistory }    = require('../main/db/history');
 const { PROVIDERS }        = require('../main/config');
+const { calculateCost }    = require('../main/pricing');
 
 // ── Global mutex — one stream at a time ──
 let _generating      = false;
@@ -53,6 +54,7 @@ function _compile(rawText, framework) {
 }
 
 // ── Anthropic streaming ──
+// Returns { inputTokens, outputTokens } from SSE usage events.
 async function _streamAnthropic(win, key, system, messages, chunkEvent, onChunk) {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
         method:  'POST',
@@ -82,7 +84,9 @@ async function _streamAnthropic(win, key, system, messages, chunkEvent, onChunk)
 
     const reader  = response.body.getReader();
     const decoder = new TextDecoder();
-    let sseBuffer = '';
+    let sseBuffer    = '';
+    let inputTokens  = 0;
+    let outputTokens = 0;
 
     while (true) {
         const { done, value } = await reader.read();
@@ -97,7 +101,14 @@ async function _streamAnthropic(win, key, system, messages, chunkEvent, onChunk)
             const data = line.slice(6).trim();
             try {
                 const parsed = JSON.parse(data);
-                if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+
+                if (parsed.type === 'message_start') {
+                    // Exact input token count from the API
+                    inputTokens = parsed.message?.usage?.input_tokens ?? 0;
+                } else if (parsed.type === 'message_delta' && parsed.usage) {
+                    // Final output token count on stream completion
+                    outputTokens = parsed.usage.output_tokens ?? 0;
+                } else if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
                     const chunk = parsed.delta.text;
                     onChunk(chunk);
                     if (win && !win.isDestroyed()) win.webContents.send(chunkEvent, chunk);
@@ -105,9 +116,12 @@ async function _streamAnthropic(win, key, system, messages, chunkEvent, onChunk)
             } catch { /* malformed SSE line — skip */ }
         }
     }
+
+    return { inputTokens, outputTokens };
 }
 
 // ── OpenAI streaming ──
+// Returns { inputTokens, outputTokens } from the final usage chunk.
 async function _streamOpenAI(win, key, system, messages, chunkEvent, onChunk) {
     const allMessages = system
         ? [{ role: 'system', content: system }, ...messages]
@@ -120,10 +134,11 @@ async function _streamOpenAI(win, key, system, messages, chunkEvent, onChunk) {
             'content-type':  'application/json',
         },
         body: JSON.stringify({
-            model:      PROVIDERS.openai.model,
-            max_tokens: 4096,
-            messages:   allMessages,
-            stream:     true,
+            model:          PROVIDERS.openai.model,
+            max_tokens:     4096,
+            messages:       allMessages,
+            stream:         true,
+            stream_options: { include_usage: true }, // enables final usage chunk
         }),
         signal: AbortSignal.any([
             _abortController.signal,
@@ -139,7 +154,9 @@ async function _streamOpenAI(win, key, system, messages, chunkEvent, onChunk) {
 
     const reader  = response.body.getReader();
     const decoder = new TextDecoder();
-    let sseBuffer = '';
+    let sseBuffer    = '';
+    let inputTokens  = 0;
+    let outputTokens = 0;
 
     while (true) {
         const { done, value } = await reader.read();
@@ -155,7 +172,14 @@ async function _streamOpenAI(win, key, system, messages, chunkEvent, onChunk) {
             if (data === '[DONE]') continue; // sentinel — compile AFTER loop, never here
             try {
                 const parsed = JSON.parse(data);
-                const chunk  = parsed.choices?.[0]?.delta?.content;
+
+                // Final usage chunk (stream_options.include_usage = true)
+                if (parsed.usage) {
+                    inputTokens  = parsed.usage.prompt_tokens     ?? 0;
+                    outputTokens = parsed.usage.completion_tokens ?? 0;
+                }
+
+                const chunk = parsed.choices?.[0]?.delta?.content;
                 if (chunk) {
                     onChunk(chunk);
                     if (win && !win.isDestroyed()) win.webContents.send(chunkEvent, chunk);
@@ -163,6 +187,8 @@ async function _streamOpenAI(win, key, system, messages, chunkEvent, onChunk) {
             } catch { /* malformed SSE line — skip */ }
         }
     }
+
+    return { inputTokens, outputTokens };
 }
 
 // ── Map HTTP status to error code ──
@@ -183,16 +209,16 @@ function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Returns { inputTokens, outputTokens } on success.
 async function _streamWithRetry(provider, win, key, system, messages, chunkEvent, onChunk) {
     let attempt = 0;
     while (true) {
         try {
             if (provider === 'openai') {
-                await _streamOpenAI(win, key, system, messages, chunkEvent, onChunk);
+                return await _streamOpenAI(win, key, system, messages, chunkEvent, onChunk);
             } else {
-                await _streamAnthropic(win, key, system, messages, chunkEvent, onChunk);
+                return await _streamAnthropic(win, key, system, messages, chunkEvent, onChunk);
             }
-            return; // success
         } catch (err) {
             if (err.name === 'AbortError') throw err; // user stop — don't retry
 
@@ -251,11 +277,15 @@ function register() {
             messages     = [{ role: 'user', content: prompt.user }];
         }
 
-        let rawBuffer = '';
+        let rawBuffer    = '';
+        let inputTokens  = 0;
+        let outputTokens = 0;
         const onChunk = chunk => { rawBuffer += chunk; };
 
         try {
-            await _streamWithRetry(provider, win, key, system, messages, chunkEvent, onChunk);
+            const usage  = await _streamWithRetry(provider, win, key, system, messages, chunkEvent, onChunk);
+            inputTokens  = usage?.inputTokens  ?? 0;
+            outputTokens = usage?.outputTokens ?? 0;
         } catch (err) {
             if (err.name !== 'AbortError') {
                 // Real API / network error
@@ -274,6 +304,10 @@ function register() {
             _aborted = true;
         }
 
+        // ── Post-stream: calculate cost ──
+        const model   = PROVIDERS[provider]?.model ?? provider;
+        const costUsd = calculateCost(provider, model, inputTokens, outputTokens);
+
         // ── Post-stream: compile (runs ONLY after reader loop exits) ──
         const partial  = _aborted;
         const compiled = (!partial && !isTest) ? _compile(rawBuffer, formData.framework) : null;
@@ -287,10 +321,13 @@ function register() {
                         skill_name:         formData.skillName,
                         framework:          formData.framework,
                         provider,
-                        model:              PROVIDERS[provider]?.model ?? provider,
+                        model,
                         input_payload_json: JSON.stringify(formData),
                         generated_md:       compiled.compiledMd,
                         status:             compiled.validation?.layer4?.valid ? 'success' : 'partial',
+                        input_tokens:       inputTokens,
+                        output_tokens:      outputTokens,
+                        cost_usd:           costUsd,
                     });
                 } catch (dbErr) {
                     console.warn('[generate] History insert failed:', dbErr.message);
@@ -306,16 +343,19 @@ function register() {
                 });
             } else {
                 win.webContents.send(endEvent, {
-                    ok:         !partial,
+                    ok:           !partial,
                     partial,
-                    rawText:    rawBuffer,
-                    compiledMd: compiled?.compiledMd  ?? null,
-                    validation: compiled?.validation  ?? null,
-                    parseError: compiled?.parseError  ?? false,
-                    skillName:  formData.skillName,
-                    framework:  formData.framework,
+                    rawText:      rawBuffer,
+                    compiledMd:   compiled?.compiledMd  ?? null,
+                    validation:   compiled?.validation  ?? null,
+                    parseError:   compiled?.parseError  ?? false,
+                    skillName:    formData.skillName,
+                    framework:    formData.framework,
                     historyId,
-                    isTest:     false,
+                    isTest:       false,
+                    inputTokens,
+                    outputTokens,
+                    costUsd,
                 });
             }
         }

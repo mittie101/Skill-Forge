@@ -14,7 +14,7 @@ function renderChatGPT(json) {
     const lines = [];
 
     // ── Title ──
-    lines.push(`# ${json.name}`);
+    lines.push(`# ${String(json.name).toLowerCase()}`);
     lines.push('');
 
     // ── Role ──

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep ^name::*)",
+      "Read(//c/projects/Skill-forge/**)",
+      "Bash(npm run build)"
+    ]
+  }
+}

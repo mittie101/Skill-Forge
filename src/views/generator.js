@@ -3,7 +3,7 @@
 (function () {
     const CAPS = {
         SKILL_NAME: 80, WHEN_TO_USE: 1000, EXAMPLE_REQUEST: 200,
-        EXAMPLE_MAX: 10, EXPECTED_INPUTS: 500, EXPECTED_OUTPUTS: 500, CONSTRAINTS: 1500,
+        EXAMPLE_MAX: 10, EXPECTED_INPUTS: 1500, EXPECTED_OUTPUTS: 1500, CONSTRAINTS: 1500,
     };
 
     // ── Module state ──
@@ -655,6 +655,11 @@
             document.getElementById('btn-retry').classList.remove('hidden');
         }
 
+        // Replace estimate with real token counts + cost from API
+        if (result.inputTokens || result.outputTokens) {
+            _showRealUsage(result.inputTokens ?? 0, result.outputTokens ?? 0, result.costUsd ?? 0);
+        }
+
         // Re-render preview if on preview tab
         if (activeOutputTab === 'preview') _renderPreview();
     }
@@ -1054,6 +1059,20 @@
         if (!text) { el.classList.add('hidden'); return; }
         const est = Math.round(text.length / 4);
         el.textContent = `~${est.toLocaleString()} tokens (estimate)`;
+        el.title = 'Rough estimate based on character count (÷4). Actual usage shown after generation.';
+        el.classList.remove('hidden');
+    }
+
+    // Replace estimate with real API-reported token counts and calculated cost.
+    function _showRealUsage(inputTokens, outputTokens, costUsd) {
+        const el = document.getElementById('token-estimate');
+        if (!el) return;
+        const total = inputTokens + outputTokens;
+        const costStr = costUsd > 0
+            ? ` · $${costUsd.toFixed(4)}`
+            : '';
+        el.textContent = `${total.toLocaleString()} tokens (${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out)${costStr}`;
+        el.title = `Input: ${inputTokens.toLocaleString()} tokens · Output: ${outputTokens.toLocaleString()} tokens · Cost: $${costUsd.toFixed(6)}`;
         el.classList.remove('hidden');
     }
 

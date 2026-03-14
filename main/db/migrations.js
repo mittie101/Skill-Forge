@@ -32,6 +32,14 @@ const MIGRATIONS = [
 
     CREATE INDEX IF NOT EXISTS idx_skills_created ON skills(created_at DESC);
     `,
+
+    // v2 — add cost tracking columns (input_tokens, output_tokens, cost_usd)
+    // SQLite requires one ADD COLUMN per statement; run as separate execs via db.exec()
+    `
+    ALTER TABLE skills ADD COLUMN input_tokens  INTEGER;
+    ALTER TABLE skills ADD COLUMN output_tokens INTEGER;
+    ALTER TABLE skills ADD COLUMN cost_usd      REAL;
+    `,
 ];
 
 module.exports = { MIGRATIONS };
