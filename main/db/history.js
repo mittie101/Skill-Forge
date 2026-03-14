@@ -18,11 +18,13 @@ function insertHistory(data) {
             (skill_name, framework, provider, model,
              input_payload_json, generated_md, file_path,
              status, error_code, error_message, version,
+             input_tokens, output_tokens, cost_usd,
              created_at, updated_at)
         VALUES
             (@skill_name, @framework, @provider, @model,
              @input_payload_json, @generated_md, @file_path,
              @status, @error_code, @error_message, @version,
+             @input_tokens, @output_tokens, @cost_usd,
              @created_at, @updated_at)
     `);
 
@@ -51,6 +53,9 @@ function insertHistory(data) {
             error_code:         data.error_code          ?? null,
             error_message:      data.error_message       ?? null,
             version:            data.version             ?? 1,
+            input_tokens:       data.input_tokens        ?? null,
+            output_tokens:      data.output_tokens       ?? null,
+            cost_usd:           data.cost_usd            ?? null,
             created_at:         now,
             updated_at:         now,
         });
@@ -74,7 +79,7 @@ function listHistory({ framework, limit = 200 } = {}) {
     if (framework) {
         return db.prepare(`
             SELECT id, skill_name, framework, provider, model,
-                   status, file_path, created_at
+                   status, file_path, input_tokens, output_tokens, cost_usd, created_at
             FROM skills
             WHERE framework = ?
             ORDER BY created_at DESC
@@ -84,7 +89,7 @@ function listHistory({ framework, limit = 200 } = {}) {
 
     return db.prepare(`
         SELECT id, skill_name, framework, provider, model,
-               status, file_path, created_at
+               status, file_path, input_tokens, output_tokens, cost_usd, created_at
         FROM skills
         ORDER BY created_at DESC
         LIMIT ?
@@ -112,7 +117,7 @@ function searchHistory(query, framework) {
     if (framework) {
         return db.prepare(`
             SELECT id, skill_name, framework, provider, model,
-                   status, file_path, created_at
+                   status, file_path, input_tokens, output_tokens, cost_usd, created_at
             FROM skills
             WHERE framework = ?
               AND (skill_name LIKE ? ESCAPE '\\' OR generated_md LIKE ? ESCAPE '\\')
@@ -123,7 +128,7 @@ function searchHistory(query, framework) {
 
     return db.prepare(`
         SELECT id, skill_name, framework, provider, model,
-               status, file_path, created_at
+               status, file_path, input_tokens, output_tokens, cost_usd, created_at
         FROM skills
         WHERE skill_name LIKE ? ESCAPE '\\'
            OR generated_md LIKE ? ESCAPE '\\'

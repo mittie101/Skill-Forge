@@ -22,7 +22,7 @@ function renderClaude(json) {
 
     // ── YAML frontmatter ──
     lines.push('---');
-    lines.push(`name: "${_esc(json.name)}"`);
+    lines.push(`name: "${_esc(String(json.name).toLowerCase())}"`);
     lines.push(`description: "${_esc(json.description)}"`);
     lines.push(`version: ${json.metadata?.version ?? 1}`);
     lines.push('framework: claude');
@@ -31,7 +31,7 @@ function renderClaude(json) {
     lines.push('');
 
     // ── Title ──
-    lines.push(`# ${json.name}`);
+    lines.push(`# ${String(json.name).toLowerCase()}`);
     lines.push('');
     lines.push(json.description);
     lines.push('');

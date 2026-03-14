@@ -99,6 +99,7 @@
                 <div class="history-row-meta">
                   ${_fwBadge(row.framework)}
                   <span class="history-row-provider text-muted text-sm">${_esc(row.provider ?? '')}</span>
+                  ${_costBadge(row.input_tokens, row.output_tokens, row.cost_usd)}
                   <span class="history-row-date text-muted text-sm">${_fmtDate(row.created_at)}</span>
                 </div>
               </div>
@@ -201,6 +202,16 @@
                 month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
             });
         } catch { return iso; }
+    }
+
+    function _costBadge(inputTokens, outputTokens, costUsd) {
+        if (costUsd == null && inputTokens == null) return '';
+        const total = (inputTokens ?? 0) + (outputTokens ?? 0);
+        const costStr = costUsd > 0 ? `$${Number(costUsd).toFixed(4)}` : '';
+        const tokStr  = total > 0   ? `${(total / 1000).toFixed(1)}k tok` : '';
+        const label   = [tokStr, costStr].filter(Boolean).join(' · ');
+        if (!label) return '';
+        return `<span class="history-row-cost text-muted text-sm" title="Input: ${inputTokens ?? 0} · Output: ${outputTokens ?? 0} · Cost: $${Number(costUsd ?? 0).toFixed(6)}">${label}</span>`;
     }
 
     function _fwBadge(fw) {
