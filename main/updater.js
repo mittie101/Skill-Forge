@@ -35,9 +35,15 @@ function initUpdater(win) {
         _send('update-error', { message: err.message });
     });
 
-    // Delay check to avoid blocking app startup
+    // Delay check to avoid blocking app startup.
+    // checkForUpdates() returns a Promise — must be caught to prevent the
+    // "No published versions on GitHub" rejection from reaching the global
+    // unhandledRejection handler and showing an error dialog.
     setTimeout(() => {
-        try { autoUpdater.checkForUpdates(); } catch {}
+        try {
+            const p = autoUpdater.checkForUpdates();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch {}
     }, 10_000);
 }
 
