@@ -19,12 +19,51 @@
 
             <ul class="nav-list">
                 <li>
-                    <button class="nav-btn active" data-view="generator">
+                    <button class="nav-btn active" data-view="builder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <path d="M3 9h18M9 21V9"/>
+                        </svg>
+                        Outliner
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-btn" data-view="generator">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="18" height="18" rx="2"/>
                             <path d="M9 9h6M9 12h6M9 15h4"/>
                         </svg>
-                        Generator
+                        Builder
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-btn" data-view="install">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        VS Code Converter
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-btn" data-view="openclaw">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                        OpenClaw Converter
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-btn" data-view="review">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            <polyline points="11 8 11 11 13 11"/>
+                        </svg>
+                        Review
                     </button>
                 </li>
                 <li>
@@ -48,29 +87,50 @@
             </ul>
 
             <div class="sidebar-footer">
-                <span class="version">v0.1.0</span>
+                <span class="version" id="app-version">v1.0.0</span>
             </div>
         </nav>
 
         <main id="content">
-            <div id="view-generator" class="view active">
-                <!-- Populated by src/views/generator.js -->
-            </div>
-            <div id="view-history" class="view">
-                <!-- Populated by src/views/history.js -->
-            </div>
-            <div id="view-settings" class="view">
-                <!-- Populated by src/views/settings.js -->
-            </div>
+            <div id="view-generator" class="view"></div>
+            <div id="view-builder"   class="view"></div>
+            <div id="view-install"   class="view"></div>
+            <div id="view-review"    class="view"></div>
+            <div id="view-openclaw"  class="view"></div>
+            <div id="view-history"   class="view"></div>
+            <div id="view-settings"  class="view"></div>
         </main>
     </div>
 
     <div id="toast-container" aria-live="polite"></div>
     <div id="modal-overlay" class="modal-overlay hidden"></div>
 
+    <!-- Keyboard shortcuts modal -->
+    <div id="shortcuts-modal" class="shortcuts-modal hidden" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+      <div class="shortcuts-modal-inner">
+        <div class="shortcuts-modal-header">
+          <h2 id="shortcuts-title" class="shortcuts-modal-title">Keyboard Shortcuts</h2>
+          <button id="shortcuts-close" class="btn btn-ghost btn-sm" aria-label="Close">✕</button>
+        </div>
+        <dl class="shortcuts-list">
+          <dt><kbd>Ctrl</kbd> + <kbd>Enter</kbd></dt><dd>Generate skill</dd>
+          <dt><kbd>Ctrl</kbd> + <kbd>S</kbd></dt><dd>Save output</dd>
+          <dt><kbd>Ctrl</kbd> + <kbd>N</kbd></dt><dd>New / clear form</dd>
+          <dt><kbd>Ctrl</kbd> + <kbd>B</kbd></dt><dd>Build outline</dd>
+          <dt><kbd>?</kbd></dt><dd>Show this panel</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Close this panel</dd>
+        </dl>
+      </div>
+    </div>
+
     <script src="lib/marked.min.js"></script>
     <script src="lib/toast.js"></script>
+    <script src="lib/utils.js"></script>
     <script src="views/generator.js"></script>
+    <script src="views/builder.js"></script>
+    <script src="views/install.js"></script>
+    <script src="views/review.js"></script>
+    <script src="views/openclaw.js"></script>
     <script src="views/history.js"></script>
     <script src="views/settings.js"></script>
     <script src="app.js"></script>

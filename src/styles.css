@@ -25,12 +25,28 @@
     --radius-lg:    14px;
 
     --sidebar-width: 200px;
-    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --opacity-disabled: 0.4;
+    --font:      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'Consolas', 'Cascadia Code', 'Fira Code', monospace;
 }
 
 /* ============================================================
-   Base reset
+   Light theme overrides
    ============================================================ */
+[data-theme="light"] {
+    --bg-base:      #f5f5fa;
+    --bg-surface:   #ffffff;
+    --bg-elevated:  #ededf6;
+    --bg-hover:     #e2e2f0;
+    --border:       #d0d0e8;
+    --border-focus: #7c3aed;
+    --text-primary: #1a1a2e;
+    --text-muted:   #5a5a7a;
+    --text-dim:     #9090b0;
+    --accent-glow:  rgba(124, 58, 237, 0.10);
+}
+
+
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -64,6 +80,14 @@ button {
     outline: none;
     background: none;
     color: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
 }
 
 input, textarea, select {
@@ -155,7 +179,8 @@ input::placeholder, textarea::placeholder {
     color: var(--text-muted);
     font-size: 14px;
     font-weight: 500;
-    transition: background 0.1s, color 0.1s;
+    border: 1px solid transparent;
+    transition: background-color 0.1s, color 0.1s, border-color 0.1s;
 }
 
 .nav-btn svg {
@@ -200,6 +225,7 @@ input::placeholder, textarea::placeholder {
     width: 100%;
     height: 100%;
     overflow: hidden;
+    contain: layout style;
 }
 
 .view.active {
@@ -217,7 +243,7 @@ input::placeholder, textarea::placeholder {
     border-radius: var(--radius-sm);
     font-size: 13px;
     font-weight: 500;
-    transition: background 0.15s, opacity 0.15s;
+    transition: background-color 0.15s, opacity 0.15s, border-color 0.15s, color 0.15s;
     white-space: nowrap;
 }
 
@@ -352,34 +378,6 @@ input::placeholder, textarea::placeholder {
 }
 
 /* ============================================================
-   Cards / panels
-   ============================================================ */
-.card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 16px;
-}
-
-.panel {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-}
-
-.panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-}
-
-.panel-body {
-    padding: 16px;
-}
-
-/* ============================================================
    Banners
    ============================================================ */
 .banner {
@@ -392,28 +390,35 @@ input::placeholder, textarea::placeholder {
 }
 
 .banner-warning {
-    background: rgba(245, 158, 11, 0.1);
+    background: rgba(245, 158, 11, 0.12);
     border: 1px solid rgba(245, 158, 11, 0.3);
     color: var(--warning);
 }
 
 .banner-danger {
-    background: rgba(239, 68, 68, 0.1);
+    background: rgba(239, 68, 68, 0.12);
     border: 1px solid rgba(239, 68, 68, 0.3);
     color: var(--danger);
 }
 
 .banner-info {
-    background: rgba(59, 130, 246, 0.1);
+    background: rgba(59, 130, 246, 0.12);
     border: 1px solid rgba(59, 130, 246, 0.3);
     color: var(--info);
 }
 
 .banner-success {
-    background: rgba(34, 197, 94, 0.1);
+    background: rgba(34, 197, 94, 0.12);
     border: 1px solid rgba(34, 197, 94, 0.3);
     color: var(--success);
 }
+
+/* ============================================================
+   Z-Index Layers (fixed stacking contexts):
+     1000  — Toast notifications (top)
+      900  — Modal overlays
+        0  — App shell, views, sidebar (default)
+   ============================================================ */
 
 /* ============================================================
    Toast notifications
@@ -454,6 +459,16 @@ input::placeholder, textarea::placeholder {
     animation: toast-out 0.2s ease forwards;
 }
 
+.toast-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.toast-action-btn {
+    margin-left: 8px;
+}
+
 @keyframes toast-in {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -486,6 +501,8 @@ input::placeholder, textarea::placeholder {
     padding: 24px;
     max-width: 440px;
     width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
@@ -506,32 +523,6 @@ input::placeholder, textarea::placeholder {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
-}
-
-/* ============================================================
-   Validation checklist
-   ============================================================ */
-.checklist {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.checklist-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--text-dim);
-}
-
-.checklist-item.pass { color: var(--success); }
-.checklist-item.fail { color: var(--danger); }
-
-.checklist-icon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
 }
 
 /* ============================================================
@@ -564,10 +555,22 @@ input::placeholder, textarea::placeholder {
     margin-left: 2px;
     vertical-align: text-bottom;
     animation: blink 0.8s step-end infinite;
+    will-change: opacity;
 }
 
 @keyframes blink {
     50% { opacity: 0; }
+}
+
+/* ============================================================
+   Reduced motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 /* ============================================================
@@ -580,8 +583,6 @@ input::placeholder, textarea::placeholder {
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
 .gap-8     { gap: 8px; }
-.gap-12    { gap: 12px; }
-.gap-16    { gap: 16px; }
 .flex-1    { flex: 1; }
 .w-full    { width: 100%; }
 .h-full    { height: 100%; }
@@ -589,21 +590,87 @@ input::placeholder, textarea::placeholder {
 .mt-auto   { margin-top: auto; }
 .text-muted { color: var(--text-muted); }
 .text-sm   { font-size: 12px; }
-.font-mono { font-family: 'Consolas', 'Cascadia Code', 'Fira Code', monospace; }
+.font-mono { font-family: var(--font-mono); }
 
 /* Spacing utilities */
 .mt-2  { margin-top: 8px; }
 .mt-4  { margin-top: 16px; }
-.ml-2  { margin-left: 8px; }
 
 /* Display utilities */
-.flex         { display: flex; }
 .flex-shrink-0 { flex-shrink: 0; }
 .cursor-default { cursor: default; }
 
 /* Text utilities */
 .word-break-all  { word-break: break-all; }
 .pre-wrap        { white-space: pre-wrap; }
+
+/* ============================================================
+   Keyboard shortcuts modal
+   ============================================================ */
+.shortcuts-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 9000;
+}
+
+.shortcuts-modal.hidden { display: none; }
+
+.shortcuts-modal-inner {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px 28px;
+    min-width: 340px;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.shortcuts-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.shortcuts-modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.shortcuts-list {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px 20px;
+    align-items: center;
+}
+
+.shortcuts-list dt {
+    display: flex;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.shortcuts-list dd {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+kbd {
+    display: inline-block;
+    padding: 2px 7px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
 
 /* Icon size helpers (SVG buttons) */
 .icon-13 { width: 13px; height: 13px; }
@@ -620,3 +687,81 @@ input::placeholder, textarea::placeholder {
 .select-provider   { max-width: 280px; }
 .select-framework  { max-width: 200px; }
 .select-fw-filter  { width: 160px; }
+
+/* ============================================================
+   Tooltip (ⓘ info icon + floating card)
+   ============================================================ */
+.tooltip-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.info-icon {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 9px;
+    font-weight: 700;
+    font-style: normal;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+    flex-shrink: 0;
+    transition: border-color 0.15s, color 0.15s;
+    line-height: 1;
+    user-select: none;
+}
+
+.tooltip-wrap:hover .info-icon {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.tooltip-card {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    width: 240px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    z-index: 200;
+    white-space: normal;
+}
+
+.tooltip-wrap:hover .tooltip-card { opacity: 1; }
+
+.tooltip-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+}
+
+/* Open downward — for fields at the top of a panel and for all buttons */
+.tooltip-card.below {
+    bottom: auto;
+    top: calc(100% + 8px);
+}
+
+/* field-header tooltips in scrollable left panels: right-align so cards open leftward (avoids right-panel clip) */
+.gen-left .field-header .tooltip-card,
+.builder-left .field-header .tooltip-card {
+    left: auto;
+    right: 0;
+}

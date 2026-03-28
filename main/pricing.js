@@ -12,7 +12,8 @@ const PRICING = {
     openai: {
         'gpt-4o':      { input: 2.50,  output: 10.00 },
         'gpt-4o-mini': { input: 0.15,  output: 0.60  },
-        'gpt-4-turbo': { input: 10.00, output: 30.00 },
+        'gpt-4.1':     { input: 2.00,  output: 8.00  },
+        'gpt-4.1-mini':{ input: 0.40,  output: 1.60  },
     },
 };
 
@@ -29,7 +30,6 @@ const PRICING = {
 function calculateCost(provider, model, inputTokens, outputTokens) {
     const rates = PRICING[provider]?.[model];
     if (!rates) {
-        console.warn(`[pricing] Unknown model ${provider}/${model} — cost not tracked`);
         return 0;
     }
     return (inputTokens / 1_000_000 * rates.input) +

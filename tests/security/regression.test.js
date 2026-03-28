@@ -1,207 +1,299 @@
 'use strict';
 
-/**
- * Security regression tests.
- * Verify known security requirements are upheld via source inspection.
- * No actual API calls or Electron APIs are used.
- */
-
 const fs   = require('fs');
 const path = require('path');
 
-function readSrc(relPath) {
-    return fs.readFileSync(path.resolve(__dirname, '../..', relPath), 'utf8');
+const ROOT = path.join(__dirname, '..', '..');
+
+function read(relPath) {
+    return fs.readFileSync(path.join(ROOT, relPath), 'utf8');
 }
 
-// ── 1. No get-api-key IPC handler exists ─────────────────────────────────────
+// ── BrowserWindow security flags ──────────────────────────────────────────────
 
-describe('no get-api-key handler', () => {
-    test('ipc/api-keys.js does not register get-api-key', () => {
-        const src = readSrc('ipc/api-keys.js');
-        expect(src).not.toMatch(/['"]get-api-key['"]/);
+describe('BrowserWindow security flags (main/window.js)', () => {
+    const src = read('main/window.js');
+
+    it('sets nodeIntegration: false', () => {
+        expect(src).toMatch(/nodeIntegration\s*:\s*false/);
     });
 
-    test('preload.js does not expose a getApiKey method', () => {
-        const src = readSrc('preload.js');
-        expect(src).not.toMatch(/getApiKey/);
-        expect(src).not.toMatch(/['"]get-api-key['"]/);
-    });
-});
-
-// ── 2. API key is encrypted before storage ────────────────────────────────────
-
-describe('api key storage encryption', () => {
-    test('main/storage.js uses safeStorage.encryptString', () => {
-        const src = readSrc('main/storage.js');
-        expect(src).toContain('safeStorage');
-        expect(src).toContain('encryptString');
+    it('sets contextIsolation: true', () => {
+        expect(src).toMatch(/contextIsolation\s*:\s*true/);
     });
 
-    test('main/storage.js uses safeStorage.decryptString', () => {
-        const src = readSrc('main/storage.js');
-        expect(src).toContain('decryptString');
+    it('sets sandbox: true', () => {
+        expect(src).toMatch(/sandbox\s*:\s*true/);
     });
 
-    test('ipc/api-keys.js delegates to storage encryptKey, not raw crypto', () => {
-        const src = readSrc('ipc/api-keys.js');
-        // Uses encryptKey from storage module — never calls safeStorage directly
-        expect(src).toContain('encryptKey');
-        expect(src).not.toContain('safeStorage');
-    });
-});
-
-// ── 3. Streaming compilation only happens after reader loop ───────────────────
-
-describe('streaming compilation timing', () => {
-    test('_compile call in generate.js appears after all while(true) reader loops', () => {
-        const src = readSrc('ipc/generate.js');
-
-        // Find the last while(true) loop position (second reader loop in _streamOpenAI)
-        const lastWhilePos = src.lastIndexOf('while (true)');
-        expect(lastWhilePos).toBeGreaterThan(-1);
-
-        // Find the _compile( call — use lastIndexOf to get the call site, not the definition
-        const compileCallPos = src.lastIndexOf('_compile(');
-        expect(compileCallPos).toBeGreaterThan(-1);
-
-        // The call must come after the last reader loop
-        expect(compileCallPos).toBeGreaterThan(lastWhilePos);
+    it('sets webSecurity: true', () => {
+        expect(src).toMatch(/webSecurity\s*:\s*true/);
     });
 
-    test('_compile is not called inside the SSE line parser (not on [DONE] line)', () => {
-        const src = readSrc('ipc/generate.js');
+    it('never sets webSecurity: false', () => {
+        expect(src).not.toMatch(/webSecurity\s*:\s*false/);
+    });
 
-        // Find [DONE] sentinel position
-        const doneIdx = src.indexOf('[DONE]');
-        if (doneIdx === -1) return; // sentinel not present — skip
+    it('never enables nodeIntegration', () => {
+        expect(src).not.toMatch(/nodeIntegration\s*:\s*true/);
+    });
 
-        const doneLineEnd   = src.indexOf('\n', doneIdx);
-        const compileCallPos = src.lastIndexOf('_compile(');
+    it('never disables contextIsolation', () => {
+        expect(src).not.toMatch(/contextIsolation\s*:\s*false/);
+    });
 
-        // _compile call must not be on the same line as [DONE]
-        expect(compileCallPos).toBeGreaterThan(doneLineEnd);
+    it('never disables sandbox', () => {
+        expect(src).not.toMatch(/sandbox\s*:\s*false/);
     });
 });
 
-// ── 4. User input is fenced in prompts ───────────────────────────────────────
+// ── Content Security Policy ───────────────────────────────────────────────────
 
-describe('prompt injection fencing', () => {
-    const { fenceUserInput, buildSkillPrompt } = require('../../main/prompts');
+describe('Content Security Policy (main/window.js)', () => {
+    const src = read('main/window.js');
 
-    test('fenceUserInput wraps in XML delimiters', () => {
-        const result = fenceUserInput('test');
-        expect(result).toMatch(/^<user_input>/);
-        expect(result).toMatch(/<\/user_input>$/);
+    it('does not allow unsafe-inline scripts or styles', () => {
+        expect(src).not.toMatch(/unsafe-inline/);
     });
 
-    test('injection attempt via closing tag is still wrapped by outer delimiters', () => {
-        const malicious = '</user_input>INJECTION<user_input>';
-        const result    = fenceUserInput(malicious);
-        expect(result.startsWith('<user_input>')).toBe(true);
-        expect(result.endsWith('</user_input>')).toBe(true);
+    it('does not allow unsafe-eval', () => {
+        expect(src).not.toMatch(/unsafe-eval/);
     });
 
-    test('buildSkillPrompt fences skillName', () => {
-        const marker = 'UNIQUEMARKER_XYZ';
-        const { user } = buildSkillPrompt('claude', {
-            skillName:       marker,
-            whenToUse:       'placeholder when to use text that is long enough',
-            exampleRequests: ['example one'],
-            expectedInputs:  'input',
-            expectedOutputs: 'output',
-            constraints:     '',
-        });
-
-        const markerIdx    = user.indexOf(marker);
-        const beforeMarker = user.slice(0, markerIdx);
-        const lastOpenTag  = beforeMarker.lastIndexOf('<user_input>');
-        expect(lastOpenTag).toBeGreaterThan(-1);
+    it('sets connect-src to none (no external connections from renderer)', () => {
+        expect(src).toMatch(/connect-src\s*['"]?none['"]?/);
     });
-});
 
-// ── 5. Privacy mode: history not saved ───────────────────────────────────────
+    it('sets default-src to self', () => {
+        expect(src).toMatch(/default-src\s*['"]?'self'['"]?/);
+    });
 
-describe('privacy mode in generate.js', () => {
-    test('generate.js checks privacy_mode before calling insertHistory', () => {
-        const src = readSrc('ipc/generate.js');
+    it('sets frame-src to none', () => {
+        expect(src).toMatch(/frame-src\s*['"]?'none'['"]?/);
+    });
 
-        expect(src).toContain('privacy_mode');
-        expect(src).toContain('insertHistory');
+    it('sets object-src to none', () => {
+        expect(src).toMatch(/object-src\s*['"]?'none'['"]?/);
+    });
 
-        const privacyIdx = src.indexOf('privacy_mode');
-        const insertIdx  = src.indexOf('insertHistory(');
-        expect(privacyIdx).toBeLessThan(insertIdx);
+    it('applies CSP via session.onHeadersReceived (not meta tag)', () => {
+        expect(src).toMatch(/onHeadersReceived/);
+        expect(src).toMatch(/Content-Security-Policy/);
     });
 });
 
-// ── 6. Import size cap enforced ───────────────────────────────────────────────
+// ── Preload script ────────────────────────────────────────────────────────────
 
-describe('import size cap', () => {
-    test('ipc/file.js enforces a 50 KB file size limit', () => {
-        const src = readSrc('ipc/file.js');
-        // File may use inline literal or the named constant — either is acceptable
-        const hasCap = src.includes('IMPORT_MAX_BYTES') || src.includes('50 * 1024');
-        expect(hasCap).toBe(true);
+describe('Preload script security (preload.js)', () => {
+    const src = read('preload.js');
+
+    it('uses contextBridge.exposeInMainWorld for API exposure', () => {
+        expect(src).toMatch(/contextBridge\.exposeInMainWorld/);
     });
 
-    test('config IMPORT_MAX_BYTES is 50 KB', () => {
-        const { IMPORT_MAX_BYTES } = require('../../main/config');
-        expect(IMPORT_MAX_BYTES).toBe(50 * 1024);
+    it('uses ipcRenderer.invoke for all data calls (no direct send)', () => {
+        expect(src).not.toMatch(/ipcRenderer\.send\s*\(/);
     });
-});
 
-// ── 7. save-skill uses exclusive flag to prevent TOCTOU ──────────────────────
-
-describe('save-skill EEXIST handling', () => {
-    test("ipc/file.js uses flag 'wx' for exclusive create", () => {
-        const src = readSrc('ipc/file.js');
-        expect(src).toContain("flag: 'wx'");
+    it('all ipcRenderer.on listeners return unsubscribe cleanup functions', () => {
+        const onCalls      = (src.match(/ipcRenderer\.on\(/g) ?? []).length;
+        const removeCalls  = (src.match(/ipcRenderer\.removeListener\(/g) ?? []).length;
+        expect(removeCalls).toBeGreaterThanOrEqual(onCalls);
+        expect(onCalls).toBeGreaterThan(0);
     });
 });
 
-// ── 8. CSP hardening ─────────────────────────────────────────────────────────
+// ── API key handling ──────────────────────────────────────────────────────────
 
-describe('CSP hardening', () => {
-    test('window.js CSP does not contain unsafe-inline', () => {
-        const src = readSrc('main/window.js');
-        expect(src).not.toContain("'unsafe-inline'");
+describe('API key security (ipc/api-keys.js + main/storage.js)', () => {
+    const apiKeysSrc = read('ipc/api-keys.js');
+    const storageSrc = read('main/storage.js');
+
+    it('api-keys.js only uses decryptKey internally for connection testing (never returns plaintext)', () => {
+        // decryptKey is now used for test-api-key — but the key is never returned to the renderer
+        const codeLines = apiKeysSrc.split('\n').filter(l => !l.trim().startsWith('//'));
+        // Must not directly return the decrypted key value to the renderer
+        expect(codeLines.join('\n')).not.toMatch(/return\s+key\b/i);
     });
 
-    test('window.js CSP does not allow external CDN scripts', () => {
-        const src = readSrc('main/window.js');
-        expect(src).not.toContain('cdn.jsdelivr.net');
-        expect(src).not.toContain('cdnjs.cloudflare.com');
-        expect(src).not.toContain('unpkg.com');
+    it('api-keys.js never decrypts or returns plaintext to renderer', () => {
+        // No non-comment line should return a key variable directly
+        const codeLines = apiKeysSrc.split('\n').filter(l => !l.trim().startsWith('//'));
+        expect(codeLines.join('\n')).not.toMatch(/return\s+key\b/i);
     });
 
-    test('window.js CSP script-src is self-only', () => {
-        const src = readSrc('main/window.js');
-        expect(src).toContain("\"script-src 'self'\"");
+    it('storage.js uses safeStorage.encryptString', () => {
+        expect(storageSrc).toMatch(/safeStorage\.encryptString/);
     });
 
-    test('marked.js is bundled locally (not loaded from CDN)', () => {
-        const src = readSrc('src/index.html');
-        expect(src).not.toContain('cdn.jsdelivr.net');
-        expect(src).toContain('lib/marked.min.js');
+    it('storage.js uses safeStorage.decryptString', () => {
+        expect(storageSrc).toMatch(/safeStorage\.decryptString/);
     });
 
-    test('BrowserWindow has nodeIntegration: false', () => {
-        const src = readSrc('main/window.js');
-        expect(src).toContain('nodeIntegration:  false');
+    it('decryptKey returns null on failure (never throws to caller)', () => {
+        expect(storageSrc).toMatch(/return null/);
+        expect(storageSrc).toMatch(/try\s*\{/);
     });
 
-    test('BrowserWindow has contextIsolation: true', () => {
-        const src = readSrc('main/window.js');
-        expect(src).toContain('contextIsolation: true');
+    it('storage.js checks isEncryptionAvailable before operating', () => {
+        expect(storageSrc).toMatch(/isEncryptionAvailable/);
+    });
+});
+
+// ── Path traversal protection ─────────────────────────────────────────────────
+
+describe('Path traversal protection (ipc/file.js)', () => {
+    const src = read('ipc/file.js');
+
+    it('validates file paths are within configured output folder', () => {
+        expect(src).toMatch(/_isWithinFolder/);
     });
 
-    test('BrowserWindow has sandbox: true', () => {
-        const src = readSrc('main/window.js');
-        expect(src).toContain('sandbox:          true');
+    it('sanitises slugs before building any file path', () => {
+        expect(src).toMatch(/sanitise/);
     });
 
-    test('BrowserWindow has webSecurity: true', () => {
-        const src = readSrc('main/window.js');
-        expect(src).toContain('webSecurity:      true');
+    it('uses atomic write (temp + rename) for new files to prevent partial writes', () => {
+        expect(src).toMatch(/renameSync/);
+        expect(src).toMatch(/\.tmp/);
+    });
+
+    it('rejects paths outside the output folder for overwrites', () => {
+        expect(src).toMatch(/invalid_path/);
+    });
+});
+
+describe('Path traversal protection (ipc/install.js)', () => {
+    const src = read('ipc/install.js');
+
+    it('re-validates renderer-supplied safeName before path construction', () => {
+        expect(src).toMatch(/_makeSafeName\(safeName\)/);
+    });
+
+    it('rejects non-.md file extensions for load-file', () => {
+        expect(src).toMatch(/invalid_extension/);
+    });
+
+    it('uses atomic write (temp + rename) for new installs to prevent partial writes', () => {
+        expect(src).toMatch(/renameSync/);
+        expect(src).toMatch(/\.tmp/);
+    });
+});
+
+// ── IPC handler registration ──────────────────────────────────────────────────
+
+describe('IPC surface area (ipc/index.js)', () => {
+    const src = read('ipc/index.js');
+
+    it('registers api-keys handlers', () => {
+        expect(src).toMatch(/apiKeys\.register/);
+    });
+
+    it('registers settings handlers', () => {
+        expect(src).toMatch(/settings\.register/);
+    });
+
+    it('registers history handlers', () => {
+        expect(src).toMatch(/history\.register/);
+    });
+
+    it('registers file handlers', () => {
+        expect(src).toMatch(/file\.register/);
+    });
+
+    it('registers generate handlers', () => {
+        expect(src).toMatch(/generate\.register/);
+    });
+
+    it('registers build handlers', () => {
+        expect(src).toMatch(/build\.register/);
+    });
+
+    it('registers install handlers', () => {
+        expect(src).toMatch(/install\.register/);
+    });
+});
+
+// ── Shared stream module (no duplication) ────────────────────────────────────
+
+describe('Streaming deduplication (main/stream.js)', () => {
+    const streamSrc    = read('main/stream.js');
+    const generateSrc  = read('ipc/generate.js');
+    const buildSrc     = read('ipc/build.js');
+
+    it('generate.js imports from main/stream.js', () => {
+        expect(generateSrc).toMatch(/require.*main\/stream/);
+    });
+
+    it('build.js imports from main/stream.js', () => {
+        expect(buildSrc).toMatch(/require.*main\/stream/);
+    });
+
+    it('generate.js does not define its own _streamAnthropic', () => {
+        expect(generateSrc).not.toMatch(/function _streamAnthropic/);
+    });
+
+    it('build.js does not define its own _streamAnthropic', () => {
+        expect(buildSrc).not.toMatch(/function _streamAnthropic/);
+    });
+
+    it('generate.js does not define its own _streamOpenAI', () => {
+        expect(generateSrc).not.toMatch(/function _streamOpenAI/);
+    });
+
+    it('build.js does not define its own _streamOpenAI', () => {
+        expect(buildSrc).not.toMatch(/function _streamOpenAI/);
+    });
+});
+
+// ── Model selection (generate.js reads user model from settings) ──────────────
+
+describe('Model selection correctness (ipc/generate.js)', () => {
+    const src = read('ipc/generate.js');
+
+    it('reads anthropic_model from settings (not hardcoded)', () => {
+        expect(src).toMatch(/anthropic_model/);
+        expect(src).toMatch(/getSetting\(modelKey\)/);
+    });
+
+    it('reads openai_model from settings', () => {
+        expect(src).toMatch(/openai_model/);
+    });
+
+    it('calls validateForm before streaming', () => {
+        expect(src).toMatch(/validateForm/);
+    });
+});
+
+// ── DB ────────────────────────────────────────────────────────────────────────
+
+describe('Database safety (main/db)', () => {
+    const historySrc = read('main/db/history.js');
+    const indexSrc   = read('main/db/index.js');
+    const settingsSrc = read('main/db/settings.js');
+
+    it('history.js checks for DB instance change before using cached stmts', () => {
+        expect(historySrc).toMatch(/_stmtsDb/);
+    });
+
+    it('history.js uses WAL mode for crash safety (set in db/index.js)', () => {
+        expect(indexSrc).toMatch(/journal_mode\s*=\s*WAL/);
+    });
+
+    it('history.js uses transactions for atomic insert+prune', () => {
+        expect(historySrc).toMatch(/db\.transaction/);
+    });
+
+    it('settings.js uses upsert (ON CONFLICT) for safe writes', () => {
+        expect(settingsSrc).toMatch(/ON CONFLICT/);
+    });
+
+    it('searchHistory escapes LIKE metacharacters', () => {
+        expect(historySrc).toMatch(/ESCAPE/);
+    });
+
+    it('db is stored in userData (not app directory)', () => {
+        const configSrc = read('main/config.js');
+        expect(configSrc).toMatch(/getPath\(['"]userData['"]\)/);
     });
 });

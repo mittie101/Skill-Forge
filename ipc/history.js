@@ -1,6 +1,9 @@
 'use strict';
 
-const { ipcMain } = require('electron');
+const { ipcMain, dialog } = require('electron');
+const fs     = require('fs');
+const path   = require('path');
+const crypto = require('crypto');
 const {
     listHistory,
     searchHistory,
@@ -36,6 +39,27 @@ function register() {
 
     ipcMain.handle('history-count', () => {
         return historyCount();
+    });
+
+    ipcMain.handle('export-history', async (_e) => {
+        const { canceled, filePath } = await dialog.showSaveDialog({
+            title:       'Export History',
+            defaultPath: 'skillforge-history.json',
+            filters:     [{ name: 'JSON', extensions: ['json'] }],
+        });
+        if (canceled || !filePath) return { ok: false, error: 'cancelled' };
+
+        const rows    = listHistory({});
+        const json    = JSON.stringify(rows, null, 2);
+        const tmpPath = filePath + '.' + crypto.randomUUID() + '.tmp';
+        try {
+            fs.writeFileSync(tmpPath, json, { encoding: 'utf8' });
+            fs.renameSync(tmpPath, filePath);
+            return { ok: true, filePath };
+        } catch (err) {
+            try { fs.unlinkSync(tmpPath); } catch {}
+            return { ok: false, error: err.message };
+        }
     });
 }
 

@@ -1,0 +1,208 @@
+<style>
+  /* Simulate SkillForge design tokens */
+  .sf {
+    --bg-base: #0a0a14;
+    --bg-surface: #0d0d1a;
+    --bg-elevated: #12122a;
+    --bg-hover: #1a1a35;
+    --border: #1e1e3a;
+    --border-focus: #7c3aed;
+    --text-primary: #e0e0e0;
+    --text-muted: #888;
+    --text-dim: #555;
+    --accent: #7c3aed;
+    --accent-glow: rgba(124, 58, 237, 0.15);
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+  .sf .field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .sf .field-input {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    margin-top: 6px;
+  }
+  .sf .label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .sf .info-icon {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 9px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.15s, color 0.15s;
+    font-style: normal;
+    line-height: 1;
+  }
+  .sf .info-icon:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* === Option A: Arrow bubble tooltip === */
+  .tt-a-wrap { position: relative; display: inline-block; }
+  .tt-a {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e1e3a;
+    border: 1px solid var(--border-focus);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 12px;
+    padding: 7px 10px;
+    white-space: nowrap;
+    max-width: 220px;
+    white-space: normal;
+    width: 220px;
+    line-height: 1.5;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .tt-a::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--border-focus);
+  }
+
+  /* === Option B: Floating card, no arrow === */
+  .tt-b {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    background: #1a1a35;
+    border: 1px solid #2a2a4a;
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 12px;
+    padding: 10px 12px;
+    width: 240px;
+    line-height: 1.6;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    z-index: 10;
+  }
+  .tt-b .tt-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+
+  /* === Option C: Inline expand === */
+  .tt-c {
+    margin-top: 5px;
+    padding: 7px 10px;
+    background: var(--accent-glow);
+    border-left: 2px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .demo-field {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 4px;
+    position: relative;
+  }
+</style>
+
+<h2>Tooltip Style</h2>
+<p class="subtitle">All three use your ⓘ icon approach — the difference is how the tooltip appears</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Arrow bubble</h3>
+      <p>Floats above with a pointer arrow. Classic tooltip feel.</p>
+      <div class="sf" style="margin-top:14px">
+        <div class="demo-field">
+          <div class="label-row">
+            <span class="field-label">Skill Name</span>
+            <div class="tt-a-wrap">
+              <i class="info-icon">i</i>
+              <div class="tt-a">A short name for your skill. Used as the filename and command name.</div>
+            </div>
+          </div>
+          <input class="field-input" placeholder="e.g. Code Review Helper" readonly>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Floating card</h3>
+      <p>Elevated card with a bold title — more space for detail.</p>
+      <div class="sf" style="margin-top:14px">
+        <div class="demo-field" style="position:relative">
+          <div class="label-row">
+            <span class="field-label">Skill Name</span>
+            <div style="position:relative;display:inline-block">
+              <i class="info-icon" style="border-color:#7c3aed;color:#7c3aed">i</i>
+              <div class="tt-b">
+                <div class="tt-title">Skill Name</div>
+                A short name for your skill. Used as the filename and command name in Claude Code.
+              </div>
+            </div>
+          </div>
+          <input class="field-input" placeholder="e.g. Code Review Helper" readonly>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Inline expand</h3>
+      <p>Clicking ⓘ reveals a hint <em>below</em> the label — no floating layer.</p>
+      <div class="sf" style="margin-top:14px">
+        <div class="demo-field">
+          <div class="label-row">
+            <span class="field-label">Skill Name</span>
+            <i class="info-icon" style="border-color:#7c3aed;color:#7c3aed">i</i>
+          </div>
+          <div class="tt-c">A short name for your skill. Used as the filename and command name in Claude Code.</div>
+          <input class="field-input" placeholder="e.g. Code Review Helper" readonly style="margin-top:8px">
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

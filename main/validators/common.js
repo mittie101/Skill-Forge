@@ -78,7 +78,7 @@ function validateJson(json) {
     }
 
     const required = ['name', 'description', 'when_to_use', 'example_requests',
-                      'expected_inputs', 'expected_outputs', 'instructions'];
+                      'expected_inputs', 'expected_outputs'];
 
     required.forEach(field => {
         if (!json[field] && json[field] !== 0) {
@@ -90,7 +90,8 @@ function validateJson(json) {
         errors.push('"when_to_use" must be at least 30 characters');
     }
 
-    if (!Array.isArray(json.instructions) || json.instructions.length < 2) {
+    if (json.instructions !== undefined &&
+        (!Array.isArray(json.instructions) || json.instructions.length < 2)) {
         errors.push('"instructions" must contain at least 2 items');
     }
 
@@ -105,6 +106,40 @@ function validateJson(json) {
         if (!validFrameworks.includes(json.metadata.framework)) {
             errors.push('metadata.framework must be claude, chatgpt, or langchain');
         }
+    }
+
+    // specialists — optional but if present must be a non-empty array of valid objects
+    if (json.specialists !== undefined) {
+        if (!Array.isArray(json.specialists) || json.specialists.length < 1) {
+            errors.push('specialists must be a non-empty array if present');
+        } else {
+            json.specialists.forEach((s, i) => {
+                if (typeof s !== 'object' || s === null)
+                    errors.push(`specialists[${i}] must be an object`);
+                else if (!s.name || typeof s.name !== 'string')
+                    errors.push(`specialists[${i}].name must be a non-empty string`);
+                else if (!Array.isArray(s.hard_rules) || s.hard_rules.length < 1)
+                    errors.push(`specialists[${i}].hard_rules must be a non-empty array`);
+            });
+        }
+    }
+
+    // decision_points — optional array of strings
+    if (json.decision_points !== undefined) {
+        if (!Array.isArray(json.decision_points))
+            errors.push('decision_points must be an array if present');
+    }
+
+    // output_format — optional array of strings
+    if (json.output_format !== undefined) {
+        if (!Array.isArray(json.output_format))
+            errors.push('output_format must be an array if present');
+    }
+
+    // constraints — optional array of strings
+    if (json.constraints !== undefined) {
+        if (!Array.isArray(json.constraints))
+            errors.push('constraints must be an array if present');
     }
 
     return { valid: errors.length === 0, errors };

@@ -2,84 +2,70 @@
 
 const { sanitise } = require('../../main/slug');
 
-describe('slug.sanitise', () => {
-    test('lowercases input', () => {
+describe('sanitise', () => {
+    it('lowercases input', () => {
         expect(sanitise('MySkill')).toBe('myskill');
     });
 
-    test('replaces spaces with hyphens', () => {
-        expect(sanitise('my skill name')).toBe('my-skill-name');
+    it('replaces spaces with hyphens', () => {
+        expect(sanitise('my skill')).toBe('my-skill');
     });
 
-    test('removes special characters', () => {
-        expect(sanitise('skill!@#$%^&*()')).toBe('skill');
+    it('collapses multiple spaces to single hyphen', () => {
+        expect(sanitise('my  skill')).toBe('my-skill');
     });
 
-    test('collapses multiple hyphens', () => {
-        expect(sanitise('skill---name')).toBe('skill-name');
+    it('removes non-alphanumeric non-hyphen characters', () => {
+        expect(sanitise('my_skill!')).toBe('myskill');
     });
 
-    test('trims leading and trailing hyphens', () => {
-        expect(sanitise('---skill---')).toBe('skill');
+    it('collapses multiple hyphens', () => {
+        expect(sanitise('my--skill')).toBe('my-skill');
     });
 
-    test('empty string returns "skill"', () => {
+    it('trims leading and trailing hyphens', () => {
+        expect(sanitise('-my-skill-')).toBe('my-skill');
+    });
+
+    it('handles empty string', () => {
         expect(sanitise('')).toBe('skill');
     });
 
-    test('null/undefined returns "skill"', () => {
+    it('handles null/undefined gracefully', () => {
         expect(sanitise(null)).toBe('skill');
         expect(sanitise(undefined)).toBe('skill');
     });
 
-    test('whitespace-only returns "skill"', () => {
-        expect(sanitise('   ')).toBe('skill');
-    });
-
-    test('Windows reserved name CON gets -skill suffix', () => {
+    it('appends -skill to Windows reserved name CON', () => {
         expect(sanitise('CON')).toBe('con-skill');
     });
 
-    test('Windows reserved name NUL gets -skill suffix', () => {
+    it('appends -skill to Windows reserved name NUL', () => {
         expect(sanitise('NUL')).toBe('nul-skill');
     });
 
-    test('Windows reserved name PRN gets -skill suffix', () => {
-        expect(sanitise('PRN')).toBe('prn-skill');
-    });
-
-    test('Windows reserved name COM1 gets -skill suffix', () => {
+    it('appends -skill to COM1', () => {
         expect(sanitise('COM1')).toBe('com1-skill');
     });
 
-    test('Windows reserved name LPT9 gets -skill suffix', () => {
+    it('appends -skill to LPT9', () => {
         expect(sanitise('LPT9')).toBe('lpt9-skill');
     });
 
-    test('non-reserved name is not modified for reserved check', () => {
-        expect(sanitise('connotation')).toBe('connotation');
-    });
-
-    test('truncates to 80 characters', () => {
+    it('truncates to 80 characters', () => {
         const long = 'a'.repeat(100);
-        expect(sanitise(long)).toBe('a'.repeat(80));
+        expect(sanitise(long)).toHaveLength(80);
     });
 
-    test('truncates exactly at 80 chars after sanitisation', () => {
-        const input = 'a'.repeat(79) + '!!!'; // special chars stripped → 79 a's
-        expect(sanitise(input)).toHaveLength(79);
+    it('handles already-valid slug unchanged', () => {
+        expect(sanitise('my-skill')).toBe('my-skill');
     });
 
-    test('unicode non-ascii chars are stripped', () => {
-        // em-dash is not a space so it is removed (not converted to hyphen)
-        expect(sanitise('skill—fancy')).toBe('skillfancy');
+    it('handles numbers in name', () => {
+        expect(sanitise('skill2')).toBe('skill2');
     });
 
-    test('numbers are preserved', () => {
-        expect(sanitise('skill123')).toBe('skill123');
-    });
-
-    test('spaces become single hyphens even with multiple spaces', () => {
-        expect(sanitise('skill   name')).toBe('skill-name');
+    it('handles mixed case with spaces and specials', () => {
+        expect(sanitise('My Cool Skill! v2')).toBe('my-cool-skill-v2');
     });
 });

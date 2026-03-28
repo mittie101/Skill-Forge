@@ -57,9 +57,9 @@
     padding: 6px 10px;
     font-size: 13px;
     font-weight: 500;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     color: var(--text-muted);
-    transition: background 0.1s, color 0.1s;
+    transition: background-color 0.1s, color 0.1s;
 }
 
 .fw-tab:hover { color: var(--text-primary); }
@@ -93,7 +93,7 @@
     gap: 4px;
     background: var(--accent-glow);
     border: 1px solid rgba(124,58,237,0.3);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     padding: 2px 6px;
     font-size: 12px;
     color: var(--accent);
@@ -138,7 +138,7 @@
 }
 
 .gen-actions kbd {
-    font-family: Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     background: rgba(255,255,255,0.1);
     border-radius: 3px;
@@ -171,6 +171,7 @@
     flex: 1;
     overflow: hidden;
     position: relative;
+    min-width: 0;
 }
 
 .output-tab-panel {
@@ -180,7 +181,7 @@
 }
 
 .output-raw {
-    font-family: Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     line-height: 1.6;
     color: var(--text-primary);
@@ -209,7 +210,7 @@
 .output-preview p  { margin: 0 0 10px; }
 .output-preview ul, .output-preview ol { padding-left: 20px; margin: 0 0 10px; }
 .output-preview li { margin-bottom: 4px; }
-.output-preview code { font-family: monospace; background: var(--bg-elevated); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+.output-preview code { font-family: var(--font-mono); background: var(--bg-elevated); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
 .output-preview pre { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; overflow-x: auto; margin: 0 0 12px; }
 .output-preview hr  { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
@@ -275,7 +276,7 @@
     border: 1px solid var(--border);
     color: var(--text-muted);
     background: var(--bg-elevated);
-    transition: all 0.1s;
+    transition: background-color 0.1s, color 0.1s, border-color 0.1s;
 }
 
 .mode-btn.active {
@@ -285,13 +286,13 @@
 }
 
 .mode-hint {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     opacity: 0.7;
 }
 
 .path-preview {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     color: var(--text-muted);
     background: var(--bg-elevated);
@@ -330,7 +331,7 @@
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     white-space: pre-wrap;
     max-height: 200px;
@@ -402,7 +403,7 @@
     padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     gap: 12px;
-    transition: background 0.1s;
+    transition: background-color 0.1s;
 }
 
 .history-row:hover { background: var(--bg-surface); }
@@ -545,7 +546,7 @@
     border-radius: 99px;
     cursor: pointer;
     position: relative;
-    transition: background 0.2s, border-color 0.2s;
+    transition: background-color 0.2s, border-color 0.2s;
 }
 
 .toggle-track::after {
@@ -557,7 +558,7 @@
     height: 14px;
     border-radius: 50%;
     background: var(--text-dim);
-    transition: transform 0.2s, background 0.2s;
+    transition: transform 0.2s, background-color 0.2s;
 }
 
 .toggle-switch input:checked + .toggle-track {
@@ -583,3 +584,931 @@
     gap: 12px;
     padding-top: 8px;
 }
+
+/* ============================================================
+   Builder view
+   ============================================================ */
+.builder-layout {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.builder-left {
+    width: 42%;
+    min-width: 300px;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    background: var(--bg-surface);
+}
+
+.builder-left-inner {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.builder-header { display: flex; flex-direction: column; gap: 2px; }
+.builder-title { font-size: 18px; font-weight: 600; }
+.builder-subtitle { margin-top: 2px; }
+
+.builder-right {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-base);
+}
+
+/* Section fields */
+.section-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.section-number {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.section-name-input { flex: 1; }
+
+/* Suggest button */
+.btn-suggest {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+}
+
+.btn-suggest:disabled { opacity: var(--opacity-disabled); cursor: default; }
+
+/* Section char badges */
+.section-chars {
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex-shrink: 0;
+    background: var(--bg-surface);
+}
+
+.section-char-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* Build stats row */
+.build-stats {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-surface);
+}
+
+/* Streaming cursor — reuses @keyframes blink from styles.css */
+.streaming-cursor {
+    display: inline-block;
+    width: 3px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 1px;
+    animation: blink 0.8s step-end infinite;
+    will-change: opacity;
+}
+
+/* ============================================================
+   Install view
+   ============================================================ */
+.install-layout {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.install-inner {
+    flex: 1;
+    overflow-y: auto;
+    max-width: 680px;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Drop zone */
+.drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 36px 24px;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+    text-align: center;
+    user-select: none;
+}
+
+.drop-zone:hover,
+.drop-zone:focus {
+    border-color: var(--border-focus);
+    background: var(--bg-elevated);
+    outline: none;
+}
+
+.drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.drop-zone.loaded {
+    border-style: solid;
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.drop-zone-text {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* Mode toggle — wider version for install */
+.mode-toggle-install {
+    flex-direction: column;
+    gap: 6px;
+}
+
+.mode-toggle-install .mode-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.mode-toggle-install .mode-hint {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    opacity: 0.7;
+}
+
+/* Info grid */
+.info-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 8px 16px;
+    padding: 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.info-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+}
+
+.info-value {
+    font-size: 13px;
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+/* Install preview */
+.install-preview {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    max-height: 320px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Status rows */
+.install-status {
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.status-success { background: rgba(34,197,94,0.12); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+.status-error   { background: rgba(239,68,68,0.12);  color: var(--danger);  border: 1px solid rgba(239,68,68,0.3); }
+.status-warning { background: rgba(245,158,11,0.12); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+.status-info    { background: rgba(59,130,246,0.12); color: var(--info);    border: 1px solid rgba(59,130,246,0.3); }
+
+.status-row {
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+}
+
+/* ── Builder: API key status pills ── */
+.key-status-bar {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.key-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.key-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.key-ok  .key-dot { background: var(--success); }
+.key-missing .key-dot { background: var(--danger); }
+.key-ok  { color: var(--text-primary); }
+
+/* ── Utility: field input size variants ── */
+.field-input-sm { width: 80px; }
+.field-input-md { width: 120px; }
+
+/* ── Utility: output toolbar label row ── */
+.output-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+}
+
+/* ── Install view: drop zone inner elements ── */
+.drop-zone-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: center;
+}
+
+.drop-zone-icon {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 12px;
+    color: var(--text-dim);
+}
+
+.drop-zone-sub { margin-top: 4px; }
+.drop-zone .btn-secondary { margin-top: 8px; }
+
+/* ── Install view: header title + subtitle wrapper ── */
+.install-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* ============================================================
+   Review view
+   ============================================================ */
+
+.review-layout {
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* ── Left panel ── */
+.review-left {
+    width: 340px;
+    min-width: 260px;
+    max-width: 400px;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.review-left-inner {
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.review-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+
+/* ── Textarea ── */
+.rv-textarea {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    resize: vertical;
+    min-height: 180px;
+}
+
+/* ── Drop zone (minimal) ── */
+.rv-drop-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.rv-drop-zone:hover,
+.rv-drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-dim, rgba(99,102,241,0.05));
+}
+
+.rv-drop-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+/* ── Meta row ── */
+.rv-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.rv-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.rv-filename {
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+}
+
+.rv-file-row {
+    display: flex;
+    gap: 8px;
+}
+
+/* ── Right panel ── */
+.review-right {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ── Empty / loading states ── */
+.rv-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-muted);
+    min-height: 200px;
+}
+
+.rv-empty-icon {
+    width: 40px;
+    height: 40px;
+    opacity: 0.3;
+}
+
+.rv-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 0;
+    color: var(--text-muted);
+}
+
+/* ── Results ── */
+.rv-results {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ── Score badge ── */
+.rv-score-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 4px;
+}
+
+.rv-score-badge {
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid currentColor;
+    flex-shrink: 0;
+}
+
+.rv-score-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rv-score-label {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.rv-verdict {
+    max-width: 320px;
+    line-height: 1.4;
+}
+
+/* ── Score colours ── */
+.score-red    { color: #ef4444; border-color: #ef4444; }
+.score-amber  { color: #f59e0b; border-color: #f59e0b; }
+.score-green  { color: #22c55e; border-color: #22c55e; }
+.score-perfect {
+    color: #f59e0b;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 4px rgba(245,158,11,0.2);
+}
+
+/* ── Category cards ── */
+.rv-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rv-cat-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.rv-cat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.rv-cat-name {
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.rv-cat-score {
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+/* ── Progress bar ── */
+.rv-progress-bar {
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.rv-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.bar-full { background: #22c55e; }
+.bar-good { background: #f59e0b; }
+.bar-poor { background: #ef4444; }
+
+.rv-cat-verdict {
+    line-height: 1.4;
+    margin: 0;
+}
+
+.rv-cat-issues {
+    margin: 4px 0 0;
+    padding-left: 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.rv-cat-issues li {
+    line-height: 1.4;
+}
+
+/* ── Improvements accordion ── */
+.rv-improvements-section {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.rv-accordion-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--bg-elevated);
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    text-align: left;
+}
+
+.rv-accordion-btn:hover {
+    background: var(--hover-bg, var(--bg-hover));
+}
+
+.rv-chevron {
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+
+.rv-chevron.rotated {
+    transform: rotate(-90deg);
+}
+
+.rv-improvements-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--border);
+}
+
+.rv-improvement-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.rv-improvement-item:last-child {
+    border-bottom: none;
+}
+
+.rv-imp-num {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    min-width: 18px;
+    padding-top: 1px;
+}
+
+.rv-imp-text {
+    flex: 1;
+}
+
+.rv-imp-copy {
+    opacity: 0;
+    flex-shrink: 0;
+    padding: 2px 4px;
+}
+
+.rv-improvement-item:hover .rv-imp-copy {
+    opacity: 1;
+}
+
+/* ── Soft hint ── */
+.rv-soft-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 8px 12px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--accent);
+}
+
+/* ── Fix It row ── */
+.rv-fix-row {
+    display: flex;
+    gap: 8px;
+}
+
+/* ── Fixed skill panel ── */
+.rv-fixed-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.rv-fixed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.rv-fixed-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.rv-fix-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(245, 158, 11, 0.08);
+    border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+    font-size: 12px;
+    color: #f59e0b;
+    line-height: 1.4;
+}
+
+.rv-fix-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px 14px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.rv-fixed-output {
+    padding: 14px;
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 500px;
+    overflow-y: auto;
+    background: var(--bg-base);
+    margin: 0;
+    border: none;
+}
+
+/* ── Error state ── */
+.rv-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    color: #ef4444;
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+    .review-layout {
+        flex-direction: column;
+    }
+    .review-left {
+        width: 100%;
+        max-width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+}
+
+/* ============================================================
+   Score delta badge (Review view)
+   ============================================================ */
+.rv-score-delta {
+    display: inline-flex;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: var(--radius-md);
+    margin-left: 10px;
+    align-self: center;
+}
+.rv-score-delta.delta-pos {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.rv-score-delta.delta-neg {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* ============================================================
+   History count wrap (Export button)
+   ============================================================ */
+.history-count-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ============================================================
+   Browse installed skills panel (Install view)
+   ============================================================ */
+.installed-panel {
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+    flex-shrink: 0;
+}
+
+.installed-panel-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    transition: background 0.15s;
+}
+.installed-panel-toggle:hover {
+    background: var(--bg-hover);
+}
+
+.installed-chevron {
+    width: 14px;
+    height: 14px;
+    margin-left: auto;
+    transition: transform 0.2s;
+}
+.installed-panel-toggle[aria-expanded="true"] .installed-chevron {
+    transform: rotate(180deg);
+}
+
+.installed-list-wrap {
+    max-height: 240px;
+    overflow-y: auto;
+    border-top: 1px solid var(--border);
+}
+
+.installed-list {
+    padding: 6px 0;
+}
+
+.installed-loading {
+    padding: 12px 24px;
+    margin: 0;
+}
+
+.installed-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 24px;
+    cursor: pointer;
+    transition: background 0.12s;
+    user-select: none;
+}
+.installed-item:hover {
+    background: var(--bg-hover);
+}
+.installed-item:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.installed-item-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.installed-item-name {
+    flex: 1;
+    font-size: 13px;
+    font-family: var(--font-mono, monospace);
+}
+
+.installed-item-load {
+    font-size: 11px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.installed-item:hover .installed-item-load {
+    opacity: 1;
+}
+
+/* ============================================================
+   Shared loading GIF
+   ============================================================ */
+.loading-gif {
+    width: 120px;
+    height: 120px;
+    object-fit: contain;
+    image-rendering: auto;
+}
+
+/* Builder — generation overlay (absolute, covers output area) */
+.b-loading-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: var(--bg-base);
+    color: var(--text-muted);
+    font-size: 13px;
+}
+

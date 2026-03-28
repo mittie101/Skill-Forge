@@ -1,4 +1,4 @@
-const { BrowserWindow, session, screen } = require('electron');
+const { BrowserWindow, session, screen, app } = require('electron');
 const path = require('path');
 
 const CSP = [
@@ -42,7 +42,29 @@ function _intersectsAnyDisplay(bounds) {
     });
 }
 
-function createWindow() {
+function createSplash() {
+    const { width, height } = screen.getPrimaryDisplay().bounds;
+    const splash = new BrowserWindow({
+        width:           1555,
+        height:          875,
+        x:               Math.round((width  - 1555) / 2),
+        y:               Math.round((height - 875)  / 2),
+        frame:           false,
+        resizable:       false,
+        skipTaskbar:     true,
+        alwaysOnTop:     true,
+        backgroundColor: '#0a0a14',
+        webPreferences: {
+            nodeIntegration:  false,
+            contextIsolation: true,
+            sandbox:          true,
+        },
+    });
+    splash.loadFile(path.join(__dirname, '..', 'src', 'splash.html'));
+    return splash;
+}
+
+function createWindow(opts = {}) {
     const saved     = _loadBounds();
     const usesSaved = saved && _intersectsAnyDisplay(saved);
 
@@ -52,7 +74,9 @@ function createWindow() {
             : { width: 1280, height: 800 }),
         minWidth:        900,
         minHeight:       600,
+        show:            opts.show !== false,
         backgroundColor: '#0a0a14',
+        icon:            path.join(__dirname, '..', 'build', 'icon.ico'),
         webPreferences: {
             preload:          path.join(__dirname, '..', 'preload.js'),
             nodeIntegration:  false,
@@ -72,6 +96,13 @@ function createWindow() {
     });
 
     win.on('close', () => _saveBounds(win.getBounds()));
+
+    // F12 opens DevTools — dev builds only; disabled in production packages
+    if (!app.isPackaged) {
+        win.webContents.on('before-input-event', (_e, input) => {
+            if (input.key === 'F12' && input.type === 'keyDown') win.webContents.toggleDevTools();
+        });
+    }
 
     // Renderer calls e.preventDefault() in beforeunload when unsaved output or
     // generation is in progress. Electron with sandbox:true silently blocks the
@@ -93,4 +124,4 @@ function createWindow() {
     return win;
 }
 
-module.exports = { createWindow, CSP };
+module.exports = { createWindow, createSplash, CSP };

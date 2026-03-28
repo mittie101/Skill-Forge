@@ -25,8 +25,7 @@
 
         if (opts.action) {
             const btn = document.createElement('button');
-            btn.className = 'btn btn-ghost btn-sm';
-            btn.style.marginLeft = '8px';
+            btn.className = 'btn btn-ghost btn-sm toast-action-btn';
             btn.textContent = opts.action.label;
             btn.addEventListener('click', () => {
                 opts.action.onClick();
@@ -57,7 +56,7 @@
         svg.setAttribute('fill', 'none');
         svg.setAttribute('stroke', 'currentColor');
         svg.setAttribute('stroke-width', '2');
-        svg.style.cssText = 'width:16px;height:16px;flex-shrink:0';
+        svg.classList.add('toast-icon');
 
         const paths = {
             success: '<polyline points="20 6 9 17 4 12"/>',

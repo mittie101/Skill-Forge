@@ -1,12 +1,38 @@
 'use strict';
 
 const { ipcMain, dialog, shell, BrowserWindow } = require('electron');
-const fs   = require('fs');
-const path = require('path');
+const fs     = require('fs');
+const path   = require('path');
+const crypto = require('crypto');
 const { getSetting }      = require('../main/db/settings');
 const { fenceUserInput }  = require('../main/prompts');
 const { sanitise }        = require('../main/slug');
 const { getDefaultOutputDir } = require('../main/config');
+
+/**
+ * Write content atomically: write to a UUID-named temp file then rename.
+ * Guarantees the destination is never left in a partial state on crash.
+ * @param {string} filePath   Final destination path
+ * @param {string} content    UTF-8 string content
+ * @param {{ exclusive?: boolean }} [opts]
+ *   exclusive=true → return { error: 'EEXIST' } if filePath already exists
+ * @returns {{ ok: true, filePath: string } | { error: string, filePath?: string, message?: string }}
+ */
+function _atomicWrite(filePath, content, { exclusive = false } = {}) {
+    if (exclusive && fs.existsSync(filePath)) {
+        return { error: 'EEXIST', filePath };
+    }
+    const tmpPath = filePath + '.' + crypto.randomUUID() + '.tmp';
+    try {
+        fs.writeFileSync(tmpPath, content, { encoding: 'utf8' });
+        fs.renameSync(tmpPath, filePath);
+        return { ok: true, filePath };
+    } catch (err) {
+        try { fs.unlinkSync(tmpPath); } catch {}
+        if (exclusive && err.code === 'EEXIST') return { error: 'EEXIST', filePath };
+        return { error: err.code ?? 'write_failed', message: err.message };
+    }
+}
 
 function _folder() {
     return getSetting('output_folder') ?? getDefaultOutputDir();
@@ -35,24 +61,17 @@ function register() {
         const filePath = _buildPath(folder, safeSlug, mode);
         try {
             if (mode !== 'flat') fs.mkdirSync(path.dirname(filePath), { recursive: true });
-            fs.writeFileSync(filePath, content, { flag: 'wx', encoding: 'utf8' });
-            return { ok: true, filePath };
         } catch (err) {
-            if (err.code === 'EEXIST') return { error: 'EEXIST', filePath };
-            return { error: err.code ?? 'write_failed', message: err.message };
+            return { error: err.code ?? 'mkdir_failed', message: err.message };
         }
+        return _atomicWrite(filePath, content, { exclusive: true });
     });
 
     // Overwrite confirmed by user
     ipcMain.handle('save-skill-overwrite', (_e, { filePath, content }) => {
         const folder = _folder();
         if (!_isWithinFolder(filePath, folder)) return { error: 'invalid_path' };
-        try {
-            fs.writeFileSync(filePath, content, { encoding: 'utf8' });
-            return { ok: true, filePath };
-        } catch (err) {
-            return { error: err.code ?? 'write_failed', message: err.message };
-        }
+        return _atomicWrite(filePath, content);
     });
 
     // Auto-increment slug suffix until an unused path is found
@@ -69,11 +88,10 @@ function register() {
         if (suffix > 999) return { error: 'copy_limit_exceeded' };
         try {
             if (mode !== 'flat') fs.mkdirSync(path.dirname(filePath), { recursive: true });
-            fs.writeFileSync(filePath, content, { flag: 'wx', encoding: 'utf8' });
-            return { ok: true, filePath };
         } catch (err) {
-            return { error: err.code ?? 'write_failed', message: err.message };
+            return { error: err.code ?? 'mkdir_failed', message: err.message };
         }
+        return _atomicWrite(filePath, content, { exclusive: true });
     });
 
     ipcMain.handle('import-skill', async (e) => {

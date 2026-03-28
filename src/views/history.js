@@ -32,6 +32,14 @@
             </div>
             <div class="history-count-wrap">
               <span id="history-row-count" class="text-muted text-sm">0 skills</span>
+              <button id="history-export-btn" class="btn btn-ghost btn-xs" title="Export all history to JSON">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-12">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Export JSON
+              </button>
             </div>
           </div>
 
@@ -59,22 +67,26 @@
         </div>`;
     }
 
+    // Shared fetch helper — avoids duplicating the search/list conditional
+    async function _fetchRows(query, framework) {
+        const q  = (query     ?? '').trim();
+        const fw = (framework ?? '') || undefined;
+        return q
+            ? window.skillforge.searchHistory(q, fw ?? '')
+            : window.skillforge.listHistory(fw ? { framework: fw } : {});
+    }
+
     async function _loadHistory(query, framework) {
         try {
-            let rows;
-            const q  = (query     ?? '').trim();
-            const fw = (framework ?? '') || undefined;
-            if (q) {
-                rows = await window.skillforge.searchHistory(q, fw ?? '');
-            } else {
-                rows = await window.skillforge.listHistory(fw ? { framework: fw } : {});
-            }
+            const rows = await _fetchRows(query, framework);
             _renderRows(rows);
             _checkWarnBanner(rows.length);
         } catch (err) {
-            console.warn('[History] Load failed:', err);
+            Toast.show('Failed to load history', 'error');
         }
     }
+
+    const PAGE_SIZE = 20;
 
     function _renderRows(rows) {
         const list  = document.getElementById('history-list');
@@ -92,7 +104,37 @@
         empty?.classList.add('hidden');
         if (count) count.textContent = `${rows.length} skill${rows.length !== 1 ? 's' : ''}`;
 
-        list.innerHTML = rows.map(row => `
+        list.innerHTML = '';
+        let rendered = 0;
+
+        function _renderBatch() {
+            const batch = rows.slice(rendered, rendered + PAGE_SIZE);
+            batch.forEach(row => list.insertAdjacentHTML('beforeend', _rowHtml(row)));
+            rendered += batch.length;
+        }
+
+        _renderBatch();
+
+        if (rendered < rows.length) {
+            const sentinel = document.createElement('div');
+            sentinel.className = 'history-sentinel';
+            list.appendChild(sentinel);
+
+            const observer = new IntersectionObserver(entries => {
+                if (!entries[0].isIntersecting) return;
+                _renderBatch();
+                if (rendered >= rows.length) {
+                    observer.disconnect();
+                    sentinel.remove();
+                }
+            }, { rootMargin: '100px' });
+
+            observer.observe(sentinel);
+        }
+    }
+
+    function _rowHtml(row) {
+        return `
             <div class="history-row" data-id="${row.id}">
               <div class="history-row-info">
                 <span class="history-row-name">${_esc(row.skill_name ?? 'Untitled')}</span>
@@ -113,7 +155,7 @@
                   </svg>
                 </button>
               </div>
-            </div>`).join('');
+            </div>`;
     }
 
     function _checkWarnBanner(count) {
@@ -130,17 +172,31 @@
     function _bindAll() {
         const searchEl = document.getElementById('history-search');
 
+        document.getElementById('history-export-btn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('history-export-btn');
+            if (btn) btn.disabled = true;
+            try {
+                const result = await window.skillforge.exportHistory();
+                if (result?.ok) {
+                    Toast.show('History exported', 'success');
+                } else if (result?.error !== 'cancelled') {
+                    Toast.show('Export failed: ' + (result?.error ?? 'unknown'), 'error');
+                }
+            } catch (err) {
+                Toast.show('Export failed: ' + err.message, 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        });
+
         searchEl?.addEventListener('input', () => {
             clearTimeout(_debounceTimer);
             _debounceTimer = setTimeout(async () => {
-                _searchSeq++;
-                const seq = _searchSeq;
+                const seq = ++_searchSeq;
                 const q   = searchEl.value.trim();
                 const fw  = document.getElementById('history-framework-filter')?.value ?? '';
                 try {
-                    const rows = q
-                        ? await window.skillforge.searchHistory(q, fw)
-                        : await window.skillforge.listHistory(fw ? { framework: fw } : {});
+                    const rows = await _fetchRows(q, fw);
                     // Discard stale results via sequence counter
                     if (seq === _searchSeq) _renderRows(rows);
                 } catch {}

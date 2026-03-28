@@ -1,8 +1,10 @@
 'use strict';
 
 (function () {
-    let _keySet  = false;
-    let _showKey = false;
+    const VALID_MODELS = {
+        anthropic: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
+        openai:    ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini'],
+    };
 
     async function mount(container) {
         container.innerHTML = _html();
@@ -11,6 +13,11 @@
     }
 
     function _html() {
+        const anthropicModelOpts = VALID_MODELS.anthropic.map(m =>
+            `<option value="${m}">${m}</option>`).join('');
+        const openaiModelOpts = VALID_MODELS.openai.map(m =>
+            `<option value="${m}">${m}</option>`).join('');
+
         return `
         <div class="settings-layout">
           <div class="settings-inner">
@@ -22,35 +29,106 @@
               <h3 class="settings-section-title">AI Provider</h3>
 
               <div class="field">
-                <label class="field-label" for="provider-select">Provider</label>
+                <label class="field-label" for="provider-select">Active provider</label>
                 <select id="provider-select" class="field-select select-provider">
                   <option value="">— Select a provider —</option>
                   <option value="anthropic">Anthropic (Claude)</option>
-                  <option value="openai">OpenAI (GPT-4o)</option>
+                  <option value="openai">OpenAI (GPT)</option>
                 </select>
+                <div class="field-hint">Determines which provider is used for generation.</div>
               </div>
+            </section>
 
-              <div class="field mt-4">
-                <label class="field-label" for="api-key-input">API Key</label>
+            <!-- API Keys -->
+            <section class="settings-section">
+              <h3 class="settings-section-title">API Keys</h3>
+
+              <!-- Anthropic key -->
+              <div class="field">
+                <label class="field-label">Anthropic API Key</label>
                 <div class="key-row">
-                  <div class="key-input-wrap" id="key-input-wrap">
-                    <div id="key-mask" class="key-mask hidden">
-                      <span id="key-mask-text" class="font-mono">••••••••</span>
-                      <span id="provider-badge" class="badge badge-yellow ml-2">Unknown</span>
+                  <div class="key-input-wrap" id="anthropic-key-wrap">
+                    <div id="anthropic-key-mask" class="key-mask hidden">
+                      <span class="font-mono">sk-ant-••••••••</span>
                     </div>
-                    <input id="api-key-input" class="field-input" type="password"
-                      placeholder="Paste your API key here…"
+                    <input id="anthropic-key-input" class="field-input" type="password"
+                      placeholder="sk-ant-…"
                       autocomplete="off" spellcheck="false">
                   </div>
-                  <button id="btn-key-toggle" class="btn btn-ghost btn-sm" title="Show/hide input">
+                  <button id="btn-anthropic-toggle" class="btn btn-ghost btn-sm" title="Show/hide">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-15">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
                     </svg>
                   </button>
-                  <button id="btn-key-save"  class="btn btn-primary btn-sm">Save key</button>
-                  <button id="btn-key-clear" class="btn btn-danger btn-sm hidden">Clear</button>
+                  <button id="btn-anthropic-save"  class="btn btn-primary btn-sm">Save</button>
+                  <button id="btn-anthropic-test"  class="btn btn-ghost btn-sm hidden">Test</button>
+                  <button id="btn-anthropic-clear" class="btn btn-danger btn-sm hidden">Clear</button>
                 </div>
-                <div class="field-hint">Your key is encrypted and stored locally. It never leaves this machine.</div>
+                <div id="anthropic-test-result" class="key-test-result hidden"></div>
+              </div>
+
+              <!-- OpenAI key -->
+              <div class="field">
+                <label class="field-label">OpenAI API Key</label>
+                <div class="key-row">
+                  <div class="key-input-wrap" id="openai-key-wrap">
+                    <div id="openai-key-mask" class="key-mask hidden">
+                      <span class="font-mono">sk-••••••••</span>
+                    </div>
+                    <input id="openai-key-input" class="field-input" type="password"
+                      placeholder="sk-…"
+                      autocomplete="off" spellcheck="false">
+                  </div>
+                  <button id="btn-openai-toggle" class="btn btn-ghost btn-sm" title="Show/hide">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-15">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  </button>
+                  <button id="btn-openai-save"  class="btn btn-primary btn-sm">Save</button>
+                  <button id="btn-openai-test"  class="btn btn-ghost btn-sm hidden">Test</button>
+                  <button id="btn-openai-clear" class="btn btn-danger btn-sm hidden">Clear</button>
+                </div>
+                <div id="openai-test-result" class="key-test-result hidden"></div>
+              </div>
+
+              <div class="field-hint">Keys are encrypted and stored locally. They never leave this machine.</div>
+            </section>
+
+            <!-- Model Selection -->
+            <section class="settings-section">
+              <h3 class="settings-section-title">Model Selection</h3>
+
+              <div class="field">
+                <label class="field-label" for="anthropic-model">Anthropic model</label>
+                <select id="anthropic-model" class="field-select">
+                  ${anthropicModelOpts}
+                </select>
+              </div>
+
+              <div class="field mt-4">
+                <label class="field-label" for="openai-model">OpenAI model</label>
+                <select id="openai-model" class="field-select">
+                  ${openaiModelOpts}
+                </select>
+              </div>
+
+              <div class="field mt-4">
+                <label class="field-label" for="max-tokens">Max tokens</label>
+                <input id="max-tokens" type="number"
+                  min="1024" max="32768" step="256" value="8192" class="field-input field-input-md">
+                <div class="field-hint">Range: 1024 – 32768</div>
+              </div>
+            </section>
+
+            <!-- Builder Defaults -->
+            <section class="settings-section">
+              <h3 class="settings-section-title">Builder Defaults</h3>
+
+              <div class="field">
+                <label class="field-label" for="default-section-count">Default section count</label>
+                <input id="default-section-count" class="field-input field-input-sm" type="number"
+                  min="2" max="10" value="5">
+                <div class="field-hint">Number of specialist sections in new Builder skills (2–10)</div>
               </div>
             </section>
 
@@ -108,6 +186,23 @@
               </div>
             </section>
 
+            <!-- Appearance -->
+            <section class="settings-section">
+              <h3 class="settings-section-title">Appearance</h3>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-label">Light mode</div>
+                  <div class="toggle-desc text-muted text-sm">
+                    Switch to a light colour scheme.
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="dark-mode-toggle">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+            </section>
+
             <!-- History -->
             <section class="settings-section">
               <h3 class="settings-section-title">History</h3>
@@ -116,6 +211,15 @@
                   <span id="hist-count">0</span> skills stored (cap: 100)
                 </span>
                 <button id="btn-clear-history" class="btn btn-danger btn-sm">Clear all history</button>
+              </div>
+            </section>
+
+            <!-- Updates -->
+            <section class="settings-section" id="update-section" style="display:none">
+              <h3 class="settings-section-title">Updates</h3>
+              <div id="update-status-row" class="history-stats-row">
+                <span class="text-muted text-sm" id="update-status-msg"></span>
+                <button id="btn-install-update" class="btn btn-primary btn-sm hidden">Install &amp; Restart</button>
               </div>
             </section>
 
@@ -131,28 +235,39 @@
     async function _loadSettings() {
         try {
             const s = await window.skillforge.loadSettings();
-            const provEl = document.getElementById('provider-select');
-            if (provEl && s.provider) provEl.value = s.provider;
-
-            const folderEl = document.getElementById('output-folder');
-            if (folderEl && s.outputFolder) folderEl.value = s.outputFolder;
-
+            // ... populate all fields
+            if (s.provider)         { const el = document.getElementById('provider-select'); if (el) el.value = s.provider; }
+            if (s.outputFolder)     { const el = document.getElementById('output-folder'); if (el) el.value = s.outputFolder; }
             const saveModeEl = document.querySelector(`input[name="save-mode"][value="${s.saveMode}"]`);
-            if (saveModeEl) saveModeEl.checked = true;
-
+            if (saveModeEl) {
+                saveModeEl.checked = true;
+            } else {
+                const firstRadio = document.querySelector('input[name="save-mode"]');
+                if (firstRadio) firstRadio.checked = true;
+            }
             const fwEl = document.getElementById('default-framework');
             if (fwEl && s.defaultFramework) fwEl.value = s.defaultFramework;
-
             const privEl = document.getElementById('privacy-toggle');
             if (privEl) privEl.checked = !!s.privacyMode;
-        } catch (err) {
-            console.warn('[Settings] Load failed:', err);
-        }
+            const antModelEl = document.getElementById('anthropic-model');
+            if (antModelEl && s.anthropicModel) antModelEl.value = s.anthropicModel;
+            const oaiModelEl = document.getElementById('openai-model');
+            if (oaiModelEl && s.openaiModel) oaiModelEl.value = s.openaiModel;
+            const maxTokEl = document.getElementById('max-tokens');
+            if (maxTokEl && s.maxTokens) maxTokEl.value = s.maxTokens;
+            const secCountEl = document.getElementById('default-section-count');
+            if (secCountEl && s.defaultSectionCount) secCountEl.value = s.defaultSectionCount;
+            const darkModeEl = document.getElementById('dark-mode-toggle');
+            if (darkModeEl) darkModeEl.checked = !!s.darkMode;
+        } catch { /* use defaults */ }
 
-        try {
-            const hasKey = await window.skillforge.hasApiKey();
-            if (hasKey) _showKeyMask(true);
-        } catch {}
+        // Check per-provider key status
+        for (const prov of ['anthropic', 'openai']) {
+            try {
+                const hasKey = await window.skillforge.hasApiKey(prov);
+                if (hasKey) _showKeyMask(prov, true);
+            } catch {}
+        }
 
         try {
             const n = await window.skillforge.historyCount();
@@ -161,17 +276,18 @@
         } catch {}
     }
 
-    function _showKeyMask(set) {
-        _keySet = set;
-        const input    = document.getElementById('api-key-input');
-        const mask     = document.getElementById('key-mask');
-        const saveBtn  = document.getElementById('btn-key-save');
-        const clearBtn = document.getElementById('btn-key-clear');
+    function _showKeyMask(provider, set) {
+        const mask     = document.getElementById(`${provider}-key-mask`);
+        const input    = document.getElementById(`${provider}-key-input`);
+        const saveBtn  = document.getElementById(`btn-${provider}-save`);
+        const testBtn  = document.getElementById(`btn-${provider}-test`);
+        const clearBtn = document.getElementById(`btn-${provider}-clear`);
         if (!input || !mask) return;
         if (set) {
             mask.classList.remove('hidden');
             input.classList.add('hidden');
             saveBtn?.classList.add('hidden');
+            testBtn?.classList.remove('hidden');
             clearBtn?.classList.remove('hidden');
         } else {
             mask.classList.add('hidden');
@@ -179,66 +295,106 @@
             input.value = '';
             input.type  = 'password';
             saveBtn?.classList.remove('hidden');
+            testBtn?.classList.add('hidden');
             clearBtn?.classList.add('hidden');
+            // Hide any stale test result
+            const resultEl = document.getElementById(`${provider}-test-result`);
+            if (resultEl) { resultEl.classList.add('hidden'); resultEl.textContent = ''; }
         }
     }
 
     function _bindAll() {
-        _bindKeyField();
+        _bindKeyField('anthropic');
+        _bindKeyField('openai');
         _bindFolderPicker();
         _bindPrivacyToggle();
         _bindSaveButton();
         _bindClearHistory();
+        _bindUpdateEvents();
     }
 
-    function _bindKeyField() {
-        const input     = document.getElementById('api-key-input');
-        const toggleBtn = document.getElementById('btn-key-toggle');
-        const saveBtn   = document.getElementById('btn-key-save');
-        const clearBtn  = document.getElementById('btn-key-clear');
+    function _bindKeyField(provider) {
+        const input     = document.getElementById(`${provider}-key-input`);
+        const toggleBtn = document.getElementById(`btn-${provider}-toggle`);
+        const saveBtn   = document.getElementById(`btn-${provider}-save`);
+        const testBtn   = document.getElementById(`btn-${provider}-test`);
+        const clearBtn  = document.getElementById(`btn-${provider}-clear`);
+        let showKey  = false;
+        let _saving  = false;
+        let _testing = false;
 
         toggleBtn?.addEventListener('click', () => {
-            _showKey = !_showKey;
-            if (_keySet) {
-                document.getElementById('key-mask')?.classList.toggle('hidden', _showKey);
-                input?.classList.toggle('hidden', !_showKey);
-            } else {
-                if (input) input.type = _showKey ? 'text' : 'password';
+            showKey = !showKey;
+            const mask = document.getElementById(`${provider}-key-mask`);
+            const isSet = !mask?.classList.contains('hidden') || input?.classList.contains('hidden');
+            if (isSet && mask) {
+                mask.classList.toggle('hidden', showKey);
+                input?.classList.toggle('hidden', !showKey);
+            } else if (input) {
+                input.type = showKey ? 'text' : 'password';
             }
         });
 
         saveBtn?.addEventListener('click', async () => {
+            if (_saving) return;
             const val = input?.value.trim();
             if (!val) { Toast.show('Paste your API key first', 'warning'); return; }
+            _saving = true;
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
             try {
-                const result = await window.skillforge.setApiKey(val);
-                if (result?.error) { Toast.show('Failed to save key: ' + result.error, 'error'); return; }
-
-                const badge    = document.getElementById('provider-badge');
-                const maskText = document.getElementById('key-mask-text');
-                if (val.startsWith('sk-ant-')) {
-                    if (badge)    { badge.textContent = 'Anthropic'; badge.className = 'badge badge-green'; }
-                    if (maskText) maskText.textContent = 'sk-ant-••••••••';
-                } else if (val.startsWith('sk-')) {
-                    if (badge)    { badge.textContent = 'OpenAI'; badge.className = 'badge badge-blue'; }
-                    if (maskText) maskText.textContent = 'sk-••••••••';
-                } else {
-                    if (badge)    { badge.textContent = 'Unknown'; badge.className = 'badge badge-yellow'; }
-                    if (maskText) maskText.textContent = '••••••••';
+                const result = await window.skillforge.setApiKey(provider, val);
+                if (result?.error) {
+                    Toast.show(`Failed to save key: ${result.error}`, 'error');
+                    return;
                 }
-                _showKeyMask(true);
-                _showKey = false;
-                Toast.show('API key saved', 'success');
-            } catch { Toast.show('Failed to save key', 'error'); }
+                _showKeyMask(provider, true);
+                showKey = false;
+                Toast.show(`${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key saved`, 'success');
+            } catch {
+                Toast.show('Failed to save key', 'error');
+            } finally {
+                _saving = false;
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+            }
+        });
+
+        testBtn?.addEventListener('click', async () => {
+            if (_testing) return;
+            _testing = true;
+            if (testBtn) { testBtn.disabled = true; testBtn.textContent = 'Testing…'; }
+            const resultEl = document.getElementById(`${provider}-test-result`);
+            if (resultEl) { resultEl.className = 'key-test-result'; resultEl.textContent = ''; }
+            try {
+                const result = await window.skillforge.testApiKey(provider);
+                if (resultEl) {
+                    resultEl.classList.remove('hidden');
+                    if (result?.ok) {
+                        resultEl.classList.add('key-test-ok');
+                        resultEl.textContent = '✓ Connection successful';
+                    } else {
+                        resultEl.classList.add('key-test-fail');
+                        const msgs = { api_401: 'Key rejected (401)', api_429: 'Rate limited (429)', api_5xx: 'Server error', timeout: 'Timed out', network_error: 'Network error', no_key: 'No key stored' };
+                        resultEl.textContent = '✗ ' + (msgs[result?.error] ?? result?.error ?? 'Unknown error');
+                    }
+                    setTimeout(() => { resultEl.classList.add('hidden'); resultEl.textContent = ''; }, 5000);
+                }
+            } catch {
+                if (resultEl) { resultEl.classList.remove('hidden'); resultEl.classList.add('key-test-fail'); resultEl.textContent = '✗ Test failed'; }
+            } finally {
+                _testing = false;
+                if (testBtn) { testBtn.disabled = false; testBtn.textContent = 'Test'; }
+            }
         });
 
         clearBtn?.addEventListener('click', async () => {
             try {
-                await window.skillforge.clearApiKey();
-                _showKeyMask(false);
-                _showKey = false;
-                Toast.show('API key cleared', 'info');
-            } catch { Toast.show('Failed to clear key', 'error'); }
+                await window.skillforge.clearApiKey(provider);
+                _showKeyMask(provider, false);
+                showKey = false;
+                Toast.show(`${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key cleared`, 'info');
+            } catch {
+                Toast.show('Failed to clear key', 'error');
+            }
         });
     }
 
@@ -257,7 +413,6 @@
     function _bindPrivacyToggle() {
         document.getElementById('privacy-toggle')?.addEventListener('change', e => {
             const active = e.target.checked;
-            // Immediately reflect in history view without requiring a save first
             window.HistoryView?.setPrivacyMode?.(active);
             if (active) {
                 Toast.show('Privacy mode enabled — history will not be recorded', 'warning');
@@ -268,24 +423,41 @@
     }
 
     function _bindSaveButton() {
-        document.getElementById('btn-settings-save')?.addEventListener('click', async () => {
-            const provider  = document.getElementById('provider-select')?.value          ?? '';
-            const folder    = document.getElementById('output-folder')?.value            ?? '';
-            const saveMode  = document.querySelector('input[name="save-mode"]:checked')?.value ?? 'package';
-            const fw        = document.getElementById('default-framework')?.value        ?? 'claude';
-            const privacy   = document.getElementById('privacy-toggle')?.checked         ?? false;
+        const btn = document.getElementById('btn-settings-save');
+        let _saving = false;
+
+        btn?.addEventListener('click', async () => {
+            if (_saving) return;
+            _saving = true;
+            if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+            const provider          = document.getElementById('provider-select')?.value          ?? '';
+            const folder            = document.getElementById('output-folder')?.value            ?? '';
+            const saveMode          = document.querySelector('input[name="save-mode"]:checked')?.value ?? 'package';
+            const fw                = document.getElementById('default-framework')?.value        ?? 'claude';
+            const privacy           = document.getElementById('privacy-toggle')?.checked         ?? false;
+            const darkMode          = document.getElementById('dark-mode-toggle')?.checked       ?? false;
+            const anthropicModel    = document.getElementById('anthropic-model')?.value          ?? 'claude-sonnet-4-20250514';
+            const openaiModel       = document.getElementById('openai-model')?.value             ?? 'gpt-4o';
+            const maxTokens         = parseInt(document.getElementById('max-tokens')?.value)     || 8192;
+            const defaultSectionCount = parseInt(document.getElementById('default-section-count')?.value) || 5;
+
             try {
                 await window.skillforge.saveSettings({
                     provider, outputFolder: folder, saveMode,
-                    defaultFramework: fw, privacyMode: privacy,
+                    defaultFramework: fw, privacyMode: privacy, darkMode,
+                    anthropicModel, openaiModel, maxTokens, defaultSectionCount,
                 });
-                // Propagate to app state so generator picks up new defaults
+                // Propagate to app state
                 if (window.App?.state?.settings) {
                     Object.assign(window.App.state.settings, {
                         provider, outputFolder: folder, saveMode,
-                        defaultFramework: fw, privacyMode: privacy,
+                        defaultFramework: fw, privacyMode: privacy, darkMode,
+                        anthropicModel, openaiModel, maxTokens, defaultSectionCount,
                     });
                 }
+                // Apply dark mode immediately
+                document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
                 Toast.show('Settings saved', 'success');
                 const msg = document.getElementById('settings-saved-msg');
                 if (msg) {
@@ -293,6 +465,10 @@
                     setTimeout(() => msg.classList.add('hidden'), 2000);
                 }
             } catch { Toast.show('Failed to save settings', 'error'); }
+            finally {
+                _saving = false;
+                if (btn) { btn.disabled = false; btn.textContent = 'Save settings'; }
+            }
         });
     }
 
@@ -305,6 +481,32 @@
                 if (el) el.textContent = 0;
                 Toast.show('History cleared', 'success');
             } catch { Toast.show('Failed to clear history', 'error'); }
+        });
+    }
+
+    function _bindUpdateEvents() {
+        if (!window.skillforge.onUpdateAvailable) return;
+
+        window.skillforge.onUpdateAvailable((info) => {
+            const section = document.getElementById('update-section');
+            const msg     = document.getElementById('update-status-msg');
+            if (section) section.style.display = '';
+            if (msg) msg.textContent = `Update v${info.version} downloading…`;
+            Toast.show(`SkillForge v${info.version} is downloading…`, 'info');
+        });
+
+        window.skillforge.onUpdateDownloaded((info) => {
+            const section   = document.getElementById('update-section');
+            const msg       = document.getElementById('update-status-msg');
+            const installBtn = document.getElementById('btn-install-update');
+            if (section)    section.style.display = '';
+            if (msg)        msg.textContent = `v${info.version} ready to install`;
+            if (installBtn) installBtn.classList.remove('hidden');
+            Toast.show(`SkillForge v${info.version} ready — click Install &amp; Restart in Settings`, 'success');
+        });
+
+        document.getElementById('btn-install-update')?.addEventListener('click', async () => {
+            await window.skillforge.installUpdate();
         });
     }
 

@@ -3,7 +3,7 @@
 (function () {
     const CAPS = {
         SKILL_NAME: 80, WHEN_TO_USE: 1000, EXAMPLE_REQUEST: 200,
-        EXAMPLE_MAX: 10, EXPECTED_INPUTS: 1500, EXPECTED_OUTPUTS: 1500, CONSTRAINTS: 1500,
+        EXAMPLE_MAX: 10, EXPECTED_INPUTS: 3000, EXPECTED_OUTPUTS: 3000, CONSTRAINTS: 3000,
     };
 
     // ── Module state ──
@@ -22,6 +22,8 @@
     let unsubTestEnd       = null;
     let testResponseBuffer = '';
     let _lastPreviewText   = null;   // Marked.js render cache
+    let _pendingOutline    = null;   // outline data queued before mount
+    let _streamRafPending  = false;  // RAF batching for stream chunk DOM updates
 
     // ── Mount ──
     async function mount(container) {
@@ -33,15 +35,24 @@
         if (s.defaultFramework) _setFramework(s.defaultFramework, false);
         if (s.saveMode)         _setSaveMode(s.saveMode, false);
 
-        // Load presets from main process
+        // Restore persisted form state (survives accidental close)
+        _restoreFormState();
+
         try {
-            presets = await window.skillforge.getPresets();
+            presets = window.App?.state?.presets ?? await window.skillforge.getPresets();
+            if (window.App?.state && !window.App.state.presets) window.App.state.presets = presets;
             _populatePresets();
-        } catch (err) {
-            console.warn('[Generator] Could not load presets:', err);
+        } catch {
+            // Presets are optional — silently skip
         }
 
         _updatePathPreview();
+
+        // Apply any outline that arrived before this view was mounted
+        if (_pendingOutline) {
+            _applyOutline(_pendingOutline.text, _pendingOutline.keyword);
+            _pendingOutline = null;
+        }
     }
 
     // ── HTML ──
@@ -53,9 +64,21 @@
           <div class="gen-left">
             <div class="gen-left-inner">
 
+              <div class="builder-header">
+                <h2 class="builder-title">Builder</h2>
+                <p class="builder-subtitle text-muted text-sm">Form-based skill generator → multi-framework skill file</p>
+              </div>
+
               <div class="field">
                 <div class="field-header">
                   <label class="field-label" for="skill-name">Skill Name</label>
+                  <span class="tooltip-wrap">
+                    <i class="info-icon" aria-label="More information">i</i>
+                    <div class="tooltip-card below">
+                      <div class="tooltip-title">Skill Name</div>
+                      A short display name — becomes the filename stem and Claude Code command name.
+                    </div>
+                  </span>
                   <span class="char-counter" id="name-counter">0 / ${CAPS.SKILL_NAME}</span>
                 </div>
                 <input id="skill-name" class="field-input" type="text"
@@ -64,7 +87,16 @@
               </div>
 
               <div class="field">
-                <label class="field-label">Framework</label>
+                <div class="field-header">
+                  <label class="field-label">Framework</label>
+                  <span class="tooltip-wrap">
+                    <i class="info-icon" aria-label="More information">i</i>
+                    <div class="tooltip-card">
+                      <div class="tooltip-title">Target Framework</div>
+                      Which AI platform to generate the skill file for. Claude uses SKILL.md format; ChatGPT and LangChain use their own conventions.
+                    </div>
+                  </span>
+                </div>
                 <div class="fw-tabs" role="tablist">
                   <button class="fw-tab active" data-fw="claude"    role="tab">Claude</button>
                   <button class="fw-tab"         data-fw="chatgpt"  role="tab">ChatGPT</button>
@@ -75,6 +107,13 @@
               <div class="field">
                 <div class="field-header">
                   <label class="field-label" for="when-to-use">When should this skill be used?</label>
+                  <span class="tooltip-wrap">
+                    <i class="info-icon" aria-label="More information">i</i>
+                    <div class="tooltip-card">
+                      <div class="tooltip-title">When to Use</div>
+                      Describe the situations that should trigger this skill. Be specific — this becomes the core routing instruction for the AI.
+                    </div>
+                  </span>
                   <span class="char-counter" id="when-counter">0 / ${CAPS.WHEN_TO_USE}</span>
                 </div>
                 <textarea id="when-to-use" class="field-textarea" rows="4"
@@ -85,6 +124,13 @@
               <div class="field">
                 <div class="field-header">
                   <label class="field-label">Example requests</label>
+                  <span class="tooltip-wrap">
+                    <i class="info-icon" aria-label="More information">i</i>
+                    <div class="tooltip-card">
+                      <div class="tooltip-title">Example Requests</div>
+                      Sample phrases a user might say to invoke this skill. Press Enter after each one. Up to 10 examples.
+                    </div>
+                  </span>
                   <span class="char-counter" id="examples-counter">0 / ${CAPS.EXAMPLE_MAX}</span>
                 </div>
                 <div class="tag-input-wrap" id="tag-wrap">
@@ -99,6 +145,13 @@
               <div class="field">
                 <div class="field-header">
                   <label class="field-label" for="expected-inputs">Expected inputs</label>
+                  <span class="tooltip-wrap">
+                    <i class="info-icon" aria-label="More information">i</i>
+                    <div class="tooltip-card">
+                      <div class="tooltip-title">Expected Inputs</div>
+                      What data or content will be passed to this skill at runtime — e.g. "a block of Python code" or "a GitHub issue URL".
+                    </div>
+                  </span>
                   <span class="char-counter" id="inputs-counter">0 / ${CAPS.EXPECTED_INPUTS}</span>
                 </div>
                 <textarea id="expected-inputs" class="field-textarea" rows="2"
@@ -109,6 +162,13 @@
               <div class="field">
                 <div class="field-header">
                   <label class="field-label" for="expected-outputs">Expected outputs</label>
+                  <span class="tooltip-wrap">
+                    <i class="info-icon" aria-label="More information">i</i>
+                    <div class="tooltip-card">
+                      <div class="tooltip-title">Expected Outputs</div>
+                      What the skill should produce — e.g. "a numbered list of review comments" or "a corrected code block".
+                    </div>
+                  </span>
                   <span class="char-counter" id="outputs-counter">0 / ${CAPS.EXPECTED_OUTPUTS}</span>
                 </div>
                 <textarea id="expected-outputs" class="field-textarea" rows="2"
@@ -119,6 +179,13 @@
               <div class="field">
                 <div class="field-header">
                   <label class="field-label" for="constraints">Constraints / hard rules</label>
+                  <span class="tooltip-wrap">
+                    <i class="info-icon" aria-label="More information">i</i>
+                    <div class="tooltip-card">
+                      <div class="tooltip-title">Constraints</div>
+                      Hard rules the AI must always or never do — e.g. "never suggest deleting files" or "always include a rationale".
+                    </div>
+                  </span>
                   <span class="char-counter" id="constraints-counter">0 / ${CAPS.CONSTRAINTS}</span>
                 </div>
                 <textarea id="constraints" class="field-textarea" rows="3"
@@ -134,12 +201,18 @@
               </div>
 
               <div class="gen-actions">
-                <button id="btn-generate" class="btn btn-primary">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-15">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                  </svg>
-                  Generate
-                </button>
+                <span class="tooltip-wrap">
+                  <button id="btn-generate" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-15">
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    </svg>
+                    Generate
+                  </button>
+                  <div class="tooltip-card below">
+                    <div class="tooltip-title">Generate</div>
+                    Sends your form to the AI and streams back a complete skill file. Requires an API key in Settings.
+                  </div>
+                </span>
                 <button id="btn-stop"  class="btn btn-secondary hidden">Stop</button>
                 <button id="btn-retry" class="btn btn-secondary hidden">Retry</button>
                 <button id="btn-import" class="btn btn-ghost" title="Import an existing .md file">Import .md</button>
@@ -295,6 +368,66 @@
         _bindModal();
     }
 
+    // ── Form state persistence (sessionStorage) ──
+    const PERSIST_KEY = 'skillforge.generator.form';
+
+    function _saveFormState() {
+        try {
+            sessionStorage.setItem(PERSIST_KEY, JSON.stringify({
+                skillName:       document.getElementById('skill-name')?.value       ?? '',
+                whenToUse:       document.getElementById('when-to-use')?.value      ?? '',
+                expectedInputs:  document.getElementById('expected-inputs')?.value  ?? '',
+                expectedOutputs: document.getElementById('expected-outputs')?.value ?? '',
+                constraints:     document.getElementById('constraints')?.value      ?? '',
+                examples,
+                framework:       activeFramework,
+            }));
+        } catch { /* sessionStorage unavailable — silently skip */ }
+    }
+
+    function _restoreFormState() {
+        try {
+            const raw = sessionStorage.getItem(PERSIST_KEY);
+            if (!raw) return;
+            const saved = JSON.parse(raw);
+            const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+            set('skill-name',       saved.skillName);
+            set('when-to-use',      saved.whenToUse);
+            set('expected-inputs',  saved.expectedInputs);
+            set('expected-outputs', saved.expectedOutputs);
+            set('constraints',      saved.constraints);
+            if (Array.isArray(saved.examples) && saved.examples.length > 0) {
+                examples = saved.examples;
+                // Re-render tag list after DOM is ready — _rebuildTags defined in _bindTagInput scope,
+                // so we dispatch a synthetic event to let the bound handler re-render.
+                document.getElementById('tag-list') && _rerenderTags();
+            }
+            if (saved.framework) _setFramework(saved.framework, false);
+            // Sync char counters
+            ['skill-name', 'when-to-use', 'expected-inputs', 'expected-outputs', 'constraints'].forEach(id => {
+                document.getElementById(id)?.dispatchEvent(new Event('input'));
+            });
+            _updatePathPreview();
+        } catch { /* corrupt state — silently skip */ }
+    }
+
+    function _rerenderTags() {
+        const list    = document.getElementById('tag-list');
+        const counter = document.getElementById('examples-counter');
+        const input   = document.getElementById('example-input');
+        if (!list) return;
+        list.innerHTML = '';
+        examples.forEach((ex, i) => {
+            const tag = document.createElement('div');
+            tag.className = 'tag';
+            tag.innerHTML = `<span class="tag-text">${_esc(ex)}</span>
+              <button class="tag-remove" data-i="${i}" aria-label="Remove">×</button>`;
+            list.appendChild(tag);
+        });
+        if (counter) counter.textContent = `${examples.length} / ${CAPS.EXAMPLE_MAX}`;
+        if (input)   input.disabled = examples.length >= CAPS.EXAMPLE_MAX;
+    }
+
     // ── Char counters ──
     function _bindCharCounters() {
         const pairs = [
@@ -313,6 +446,7 @@
                 counter.textContent = `${len} / ${cap}`;
                 counter.className = 'char-counter' +
                     (len >= cap ? ' over' : len >= cap * 0.9 ? ' warn' : '');
+                _saveFormState();
             };
             el.addEventListener('input', update);
             if (id === 'skill-name') el.addEventListener('input', _updatePathPreview);
@@ -342,7 +476,10 @@
         document.querySelectorAll('.fw-tab').forEach(b => {
             b.classList.toggle('active', b.dataset.fw === fw);
         });
-        if (persist) window.skillforge.saveSettings({ defaultFramework: fw }).catch(() => {});
+        if (persist) {
+            window.skillforge.saveSettings({ defaultFramework: fw }).catch(() => {});
+            _saveFormState();
+        }
     }
 
     // ── Tag input ──
@@ -371,6 +508,7 @@
             examples.push(val.slice(0, CAPS.EXAMPLE_REQUEST));
             input.value = '';
             _renderTags();
+            _saveFormState();
         };
 
         input.addEventListener('keydown', e => {
@@ -380,6 +518,7 @@
             } else if (e.key === 'Backspace' && !input.value && examples.length > 0) {
                 examples.pop();
                 _renderTags();
+                _saveFormState();
             }
         });
 
@@ -388,6 +527,7 @@
             if (btn) {
                 examples.splice(Number(btn.dataset.i), 1);
                 _renderTags();
+                _saveFormState();
             }
         });
 
@@ -421,9 +561,26 @@
         // Cache — only re-render when content actually changed
         if (text === _lastPreviewText) return;
         _lastPreviewText = text;
-        // Only render validated compiledMd via marked — never raw AI buffer to avoid XSS
+        // Only render validated compiledMd via marked — never raw AI buffer to avoid XSS.
+        // Sanitize into a detached element FIRST so on* handlers never fire against live DOM.
         if (compiledMd && typeof marked !== 'undefined') {
-            el.innerHTML = marked.parse(compiledMd);
+            const tmp = document.createElement('div');
+            tmp.innerHTML = marked.parse(compiledMd, { headerIds: false, mangle: false });
+            tmp.querySelectorAll('script').forEach(n => n.remove());
+            tmp.querySelectorAll('*').forEach(n => {
+                [...n.attributes].forEach(attr => {
+                    if (/^on\w+/i.test(attr.name)) n.removeAttribute(attr.name);
+                });
+            });
+            tmp.querySelectorAll('a[href]').forEach(a => {
+                const h = a.getAttribute('href') ?? '';
+                if (/^(javascript|data):/i.test(h)) a.removeAttribute('href');
+            });
+            tmp.querySelectorAll('img[src]').forEach(img => {
+                const s = img.getAttribute('src') ?? '';
+                if (/^(javascript|data:text)/i.test(s)) img.removeAttribute('src');
+            });
+            el.innerHTML = tmp.innerHTML;
         } else {
             el.innerHTML = `<pre class="pre-wrap">${_esc(text)}</pre>`;
         }
@@ -543,7 +700,7 @@
         try {
             const provider = await window.skillforge.getProvider();
             if (!provider) { _showBanner('no-provider'); return; }
-            const hasKey = await window.skillforge.hasApiKey();
+            const hasKey = await window.skillforge.hasApiKey(provider);
             if (!hasKey) { _showBanner('no-key'); return; }
         } catch { _showBanner('no-key'); return; }
 
@@ -569,8 +726,14 @@
         _unsubscribeStream();
         unsubChunk = window.skillforge.onStreamChunk(chunk => {
             outputRawText += chunk;
-            _updateRawDisplay(outputRawText);
-            _updateTokenEstimate(outputRawText);
+            if (!_streamRafPending) {
+                _streamRafPending = true;
+                requestAnimationFrame(() => {
+                    _streamRafPending = false;
+                    _updateRawDisplay(outputRawText);
+                    _updateTokenEstimate(outputRawText);
+                });
+            }
         });
         unsubEnd = window.skillforge.onStreamEnd(result => _onStreamEnd(result));
 
@@ -578,6 +741,10 @@
             const res = await window.skillforge.generate(formData);
             if (res?.error === 'generation_in_progress') {
                 Toast.show('Generation already running', 'warning');
+                _setGenerating(false);
+                _unsubscribeStream();
+            } else if (res?.error === 'validation_failed') {
+                Toast.show(res.errors?.[0] ?? 'Invalid form data', 'warning');
                 _setGenerating(false);
                 _unsubscribeStream();
             }
@@ -671,7 +838,7 @@
 
     // ── Retry ──
     function _retryGeneration() {
-        if (!lastFormData) return;
+        if (!lastFormData || window.App?.state?.isGenerating) return;
         document.getElementById('btn-retry').classList.add('hidden');
         outputRawText = '';
         compiledMd    = null;
@@ -912,6 +1079,7 @@
         _showCopyButton(false);
         _showOpenEditorButton(false);
         window.App.state.hasUnsavedOutput = false;
+        try { sessionStorage.removeItem(PERSIST_KEY); } catch {}
     }
 
     // ── Load from history (reopen) ──
@@ -952,6 +1120,7 @@
 
     // ── Stream helpers ──
     function _unsubscribeStream() {
+        _streamRafPending = false;
         if (unsubChunk) { unsubChunk(); unsubChunk = null; }
         if (unsubEnd)   { unsubEnd();   unsubEnd   = null; }
     }
@@ -1152,6 +1321,152 @@
         return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    // ── Parse ## sections from markdown body ──
+    // Parse top-level ## sections from a markdown body
+    function _parseSections(body) {
+        const lines    = body.split('\n');
+        const sections = [];
+        let heading = null, buf = [];
+        for (const line of lines) {
+            if (line.startsWith('## ')) {
+                if (heading !== null) sections.push([heading, buf.join('\n').trim()]);
+                heading = line.slice(3).trim();
+                buf = [];
+            } else if (heading !== null) {
+                buf.push(line);
+            }
+        }
+        if (heading !== null) sections.push([heading, buf.join('\n').trim()]);
+        return sections;
+    }
+
+    // Parse ### sub-sections from a section body
+    function _parseSubSections(body) {
+        const lines    = body.split('\n');
+        const sections = [];
+        let heading = null, buf = [];
+        for (const line of lines) {
+            if (line.startsWith('### ')) {
+                if (heading !== null) sections.push([heading, buf.join('\n').trim()]);
+                heading = line.slice(4).trim();
+                buf = [];
+            } else if (heading !== null) {
+                buf.push(line);
+            }
+        }
+        if (heading !== null) sections.push([heading, buf.join('\n').trim()]);
+        return sections;
+    }
+
+    // ── Load outline from Outliner → populate form inputs ──
+    function loadBuilderOutput(text, keyword) {
+        if (!text) return;
+        // If the view hasn't been mounted yet, queue it for when mount() runs
+        if (!document.getElementById('skill-name')) {
+            _pendingOutline = { text, keyword };
+            return;
+        }
+        _applyOutline(text, keyword);
+    }
+
+    function _applyOutline(text, keyword) {
+
+        // Strip frontmatter, extract name if present
+        let name = keyword || '';
+        let body = text;
+        if (text.startsWith('---')) {
+            const end = text.indexOf('\n---', 3);
+            if (end !== -1) {
+                const fm = text.slice(4, end);
+                for (const line of fm.split('\n')) {
+                    const colon = line.indexOf(':');
+                    if (colon !== -1 && line.slice(0, colon).trim() === 'name') {
+                        name = line.slice(colon + 1).trim().replace(/^["']|["']$/g, '') || name;
+                    }
+                }
+                body = text.slice(end + 4).trim();
+            }
+        }
+
+        let whenToUse        = '';
+        let exampleBullets   = [];
+        const allInputs      = [];
+        const allOutputs     = [];
+        const allRules       = [];
+
+        for (const [heading, content] of _parseSections(body)) {
+            const h = heading.toLowerCase();
+
+            if (h.includes('when to use') || h === 'when') {
+                whenToUse = content;
+            } else if (h.includes('example')) {
+                // Parse bullet points (-  or *) into the examples tag list
+                const bullets = content.split('\n')
+                    .map(l => l.replace(/^[-*]\s*/, '').trim())
+                    .filter(l => l.length > 0);
+                exampleBullets = bullets.slice(0, CAPS.EXAMPLE_MAX);
+            } else {
+                // Specialist section — distribute sub-sections to the right fields
+                for (const [sub, subContent] of _parseSubSections(content)) {
+                    const s = sub.toLowerCase();
+                    if (s.includes('expected input') || (s.includes('input') && !s.includes('output'))) {
+                        allInputs.push(subContent.trim());
+                    } else if (s.includes('expected output') || s.includes('output') || s.includes('result')) {
+                        allOutputs.push(subContent.trim());
+                    } else if (s.includes('hard rule') || s.includes('rule')) {
+                        allRules.push(subContent.trim());
+                    }
+                    // 'when to use this section' sub-headings are intentionally skipped
+                }
+            }
+        }
+
+        // Populate skill name
+        const nameEl = document.getElementById('skill-name');
+        if (nameEl && name) {
+            nameEl.value = name.slice(0, CAPS.SKILL_NAME);
+            nameEl.dispatchEvent(new Event('input'));
+        }
+
+        // Populate when-to-use
+        const whenEl = document.getElementById('when-to-use');
+        if (whenEl && whenToUse) {
+            whenEl.value = whenToUse.slice(0, CAPS.WHEN_TO_USE);
+            whenEl.dispatchEvent(new Event('input'));
+        }
+
+        // Populate example requests tag list
+        if (exampleBullets.length > 0) {
+            examples = exampleBullets.map(r => r.slice(0, CAPS.EXAMPLE_REQUEST));
+            _rebuildTags();
+        }
+
+        // Populate expected-inputs (joined from all specialist sub-sections)
+        const inputsEl = document.getElementById('expected-inputs');
+        if (inputsEl && allInputs.length > 0) {
+            inputsEl.value = allInputs.join('\n\n').slice(0, CAPS.EXPECTED_INPUTS);
+            inputsEl.dispatchEvent(new Event('input'));
+        }
+
+        // Populate expected-outputs
+        const outputsEl = document.getElementById('expected-outputs');
+        if (outputsEl && allOutputs.length > 0) {
+            outputsEl.value = allOutputs.join('\n\n').slice(0, CAPS.EXPECTED_OUTPUTS);
+            outputsEl.dispatchEvent(new Event('input'));
+        }
+
+        // Populate constraints from hard rules
+        const constraintsEl = document.getElementById('constraints');
+        if (constraintsEl && allRules.length > 0) {
+            constraintsEl.value = allRules.join('\n\n').slice(0, CAPS.CONSTRAINTS);
+            constraintsEl.dispatchEvent(new Event('input'));
+        }
+
+        // Clear output area — input is what matters now
+        _setOutput('', false);
+        _updatePathPreview();
+    }
+
     // ── Public API ──
-    window.GeneratorView = { mount, triggerGenerate, triggerSave, clearForm, loadFromHistory };
+    window.GeneratorView = { mount, triggerGenerate, triggerSave, clearForm, loadFromHistory, loadBuilderOutput };
 })();

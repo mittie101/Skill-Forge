@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 const { getDbPath } = require('../config');
 const { MIGRATIONS } = require('./migrations');
+const { app } = require('electron');
 
 let _db = null;
 
@@ -47,7 +48,7 @@ function _runMigrations(db) {
                 db.exec(pending[i]);
                 db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(version);
             })();
-            console.log(`[DB] Migration v${version} applied.`);
+            if (!app.isPackaged) console.log(`[DB] Migration v${version} applied.`);
         } catch (err) {
             console.error(`[DB] Migration v${version} failed:`, err.message);
             throw Object.assign(

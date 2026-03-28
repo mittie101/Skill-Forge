@@ -1,47 +1,67 @@
 const { getDb } = require('./index');
 const { HISTORY_CAP } = require('../config');
 
+// ── Cached prepared statements ──
+// _stmtsDb tracks which db instance the statements were compiled against.
+// If closeDb() is called and a new db is opened, stmts are rebuilt automatically.
+let _stmts   = null;
+let _stmtsDb = null;
+
+function _getStmts() {
+    const db = getDb();
+    // Invalidate cache if the db instance changed (e.g. after close + reopen)
+    if (_stmts && _stmtsDb !== db) _stmts = null;
+    if (_stmts) return _stmts;
+
+    _stmtsDb = db;
+    _stmts = {
+        insert: db.prepare(`
+            INSERT INTO skills
+                (skill_name, framework, provider, model,
+                 input_payload_json, generated_md, file_path,
+                 status, error_code, error_message, version,
+                 input_tokens, output_tokens, cost_usd,
+                 created_at, updated_at)
+            VALUES
+                (@skill_name, @framework, @provider, @model,
+                 @input_payload_json, @generated_md, @file_path,
+                 @status, @error_code, @error_message, @version,
+                 @input_tokens, @output_tokens, @cost_usd,
+                 @created_at, @updated_at)
+        `),
+        pruneOldest: db.prepare(`
+            DELETE FROM skills
+            WHERE id = (SELECT id FROM skills ORDER BY created_at ASC, id ASC LIMIT 1)
+        `),
+        count:      db.prepare('SELECT COUNT(*) as n FROM skills'),
+        getById:    db.prepare('SELECT * FROM skills WHERE id = ?'),
+        deleteById: db.prepare('DELETE FROM skills WHERE id = ?'),
+        clearAll:   db.prepare('DELETE FROM skills'),
+        countAll:   db.prepare('SELECT COUNT(*) as n FROM skills'),
+    };
+    return _stmts;
+}
+
 /**
  * Insert a new skill generation record.
- * Enforces 100-row cap by deleting the oldest row on overflow.
+ * Enforces HISTORY_CAP-row cap by deleting the oldest row on overflow.
  * Privacy mode: caller skips this function entirely — do not call if privacy on.
  *
  * @param {object} data
  * @returns {number} inserted row id
  */
 function insertHistory(data) {
-    const db = getDb();
-    const now = new Date().toISOString();
-
-    const insert = db.prepare(`
-        INSERT INTO skills
-            (skill_name, framework, provider, model,
-             input_payload_json, generated_md, file_path,
-             status, error_code, error_message, version,
-             input_tokens, output_tokens, cost_usd,
-             created_at, updated_at)
-        VALUES
-            (@skill_name, @framework, @provider, @model,
-             @input_payload_json, @generated_md, @file_path,
-             @status, @error_code, @error_message, @version,
-             @input_tokens, @output_tokens, @cost_usd,
-             @created_at, @updated_at)
-    `);
-
-    const pruneOldest = db.prepare(`
-        DELETE FROM skills
-        WHERE id = (SELECT id FROM skills ORDER BY created_at ASC, id ASC LIMIT 1)
-    `);
-
-    const countStmt = db.prepare('SELECT COUNT(*) as n FROM skills');
+    const db    = getDb();
+    const stmts = _getStmts();
+    const now   = new Date().toISOString();
 
     const run = db.transaction(() => {
-        const { n } = countStmt.get();
+        const { n } = stmts.count.get();
         if (n >= HISTORY_CAP) {
-            pruneOldest.run();
+            stmts.pruneOldest.run();
         }
 
-        const result = insert.run({
+        const result = stmts.insert.run({
             skill_name:         data.skill_name         ?? null,
             framework:          data.framework           ?? null,
             provider:           data.provider            ?? null,
@@ -70,10 +90,10 @@ function insertHistory(data) {
  * List history rows, newest first.
  * @param {object} [opts]
  * @param {string} [opts.framework]  filter by framework
- * @param {number} [opts.limit]      default 200
+ * @param {number} [opts.limit]      defaults to HISTORY_CAP (matches the enforced cap)
  * @returns {object[]}
  */
-function listHistory({ framework, limit = 200 } = {}) {
+function listHistory({ framework, limit = HISTORY_CAP } = {}) {
     const db = getDb();
 
     if (framework) {
@@ -147,34 +167,21 @@ function getHistoryById(id) {
     return db.prepare('SELECT * FROM skills WHERE id = ?').get(id) ?? null;
 }
 
-/**
- * Delete a history row by id.
- * @param {number} id
- * @returns {boolean} true if a row was deleted
- */
 function deleteHistory(id) {
-    const db = getDb();
-    const result = db.prepare('DELETE FROM skills WHERE id = ?').run(id);
+    const stmts = _getStmts();
+    const result = stmts.deleteById.run(id);
     return result.changes > 0;
 }
 
-/**
- * Delete all history rows.
- * @returns {number} rows deleted
- */
 function clearHistory() {
-    const db = getDb();
-    const result = db.prepare('DELETE FROM skills').run();
+    const stmts = _getStmts();
+    const result = stmts.clearAll.run();
     return result.changes;
 }
 
-/**
- * Count of history rows.
- * @returns {number}
- */
 function historyCount() {
-    const db = getDb();
-    return db.prepare('SELECT COUNT(*) as n FROM skills').get().n;
+    const stmts = _getStmts();
+    return stmts.countAll.get().n;
 }
 
 module.exports = {
